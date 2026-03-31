@@ -320,6 +320,7 @@ function renderSettings() {
   set('cfg-termos',        p.termos_garantia);
   set('cfg-observacoes',   p.observacoes_padrao);
   set('cfg-rodape',        p.rodape);
+  set('cfg-inscricao-municipal', p.inscricao_municipal);
   set('cfg-iss',           p.aliquota_iss ?? 2.0);
   set('cfg-cert',          p.cert_digital_path);
   set('cfg-serie',         p.nfse_serie || '1');
@@ -371,6 +372,7 @@ async function saveProfileData() {
     termos_garantia:     document.getElementById('cfg-termos').value.trim(),
     observacoes_padrao:  document.getElementById('cfg-observacoes').value.trim(),
     rodape:              document.getElementById('cfg-rodape').value.trim(),
+    inscricao_municipal: document.getElementById('cfg-inscricao-municipal').value.trim(),
     regime_tributario:   document.getElementById('cfg-regime').value,
     aliquota_iss:        parseFloat(document.getElementById('cfg-iss').value) || 2.0,
     cert_digital_path:   document.getElementById('cfg-cert').value.trim(),
@@ -1092,11 +1094,20 @@ function openNFSe(id) {
   if (!os) return;
   currentOSId = os.id;
 
-  // Pré-preenche o formulário com os dados da OS
+  // Prestador — dados do perfil da empresa
+  const p = currentProfile || {};
+  document.getElementById('nfse-prestador-razao').value = p.razao_social  || '';
+  document.getElementById('nfse-prestador-cnpj').value  = p.cnpj_cpf      || '';
+  document.getElementById('nfse-prestador-im').value    = p.inscricao_municipal || '';
+  document.getElementById('nfse-iss-aliq').value        = (p.aliquota_iss ?? 2).toFixed(1);
+  document.getElementById('nfse-municipio').value       = p.cidade         || '';
+
+  // Tomador — dados da OS
   document.getElementById('nfse-tomador-nome').value    = os.cliente;
   document.getElementById('nfse-tomador-tel').value     = os.telefone;
   document.getElementById('nfse-servico-desc').value    = `${os.tipo} — ${os.marca}: ${os.defeito}`;
   document.getElementById('nfse-valor').value           = (os.valor || 0).toFixed(2);
+
   document.getElementById('nfse-success').classList.remove('show');
   document.getElementById('nfse-form-inner').style.display = 'block';
 
