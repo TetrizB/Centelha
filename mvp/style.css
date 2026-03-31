@@ -42,18 +42,37 @@
 
 /* ── Reset ─────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { font-size: 16px; scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  /* Suporte a notch/home indicator (iPhone, Android) */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
 body {
   font-family: var(--font);
   background: var(--bg);
   color: var(--text);
   line-height: 1.6;
   min-height: 100vh;
+  min-height: 100dvh; /* Dynamic Viewport Height — garante altura correta em mobile */
   overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent; /* Remove flash azul no toque */
+  touch-action: manipulation; /* Elimina delay de 300ms no clique */
+  user-select: none; /* Evita seleção acidental de texto ao rolar */
 }
+/* Permite seleção em inputs e textos de leitura */
+input, textarea, p, h1, h2, h3, h4, span { user-select: auto; }
 img { max-width: 100%; display: block; }
 button { cursor: pointer; font-family: var(--font); border: none; outline: none; }
-input, select, textarea { font-family: var(--font); }
+/* Impede zoom ao focar input no iOS (font-size >= 16px) */
+input, select, textarea {
+  font-family: var(--font);
+  font-size: 16px;
+}
 a { color: inherit; text-decoration: none; }
 
 /* ── Typography ────────────────────────────────────────────── */
@@ -112,6 +131,8 @@ p  { color: var(--text-light); font-size: .9375rem; }
   display: flex;
   z-index: 100;
   box-shadow: 0 -4px 12px rgba(0,0,0,.08);
+  /* Empurra para cima do home indicator (iPhone X+, Android gesture bar) */
+  padding-bottom: env(safe-area-inset-bottom);
 }
 .nav-item {
   flex: 1;
@@ -126,6 +147,8 @@ p  { color: var(--text-light); font-size: .9375rem; }
   font-weight: 500;
   transition: var(--transition);
   position: relative;
+  /* Mínimo 44px para toque fácil */
+  min-height: 44px;
 }
 .nav-item.active { color: var(--primary); }
 .nav-item.active svg { stroke: var(--primary); }
@@ -143,10 +166,13 @@ p  { color: var(--text-light); font-size: .9375rem; }
 
 .main-content {
   flex: 1;
-  padding: 16px 16px 80px;
+  /* padding-bottom extra para cobrir nav + safe-area */
+  padding: 16px 16px calc(80px + env(safe-area-inset-bottom));
   max-width: 600px;
   width: 100%;
   margin: 0 auto;
+  /* Scroll suave como nativo no iOS */
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ── Screens ───────────────────────────────────────────────── */
@@ -764,15 +790,54 @@ textarea.form-control { resize: vertical; min-height: 90px; }
   .os-doc-section ol { padding-left: 12px !important; gap: 1px !important; }
 }
 
+/* ── form-input: alias de form-control usado em configurações ── */
+.form-input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 16px; /* >= 16px evita zoom no iOS */
+  color: var(--text);
+  background: var(--surface);
+  transition: var(--transition);
+  -webkit-appearance: none;
+}
+.form-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(26,54,93,.12);
+}
+.form-input::placeholder { color: #a0aec0; }
+select.form-input {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23718096' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 36px;
+}
+textarea.form-input { resize: vertical; min-height: 90px; }
+
 /* ── Tablet / Desktop ──────────────────────────────────────── */
 @media (min-width: 600px) {
-  .main-content { padding: 24px 24px 96px; }
+  .main-content { padding: 24px 24px calc(96px + env(safe-area-inset-bottom)); }
   .metrics-strip { grid-template-columns: repeat(3, 1fr); }
   .form-row { grid-template-columns: 1fr 1fr; }
 }
 @media (min-width: 960px) {
   .main-content { max-width: 720px; }
   .bottom-nav { max-width: 600px; left: 50%; transform: translateX(-50%); }
+}
+
+/* ── Landscape mobile ──────────────────────────────────────── */
+@media (max-height: 500px) and (orientation: landscape) {
+  .top-bar { height: 44px; }
+  .bottom-nav { display: none; }
+  .main-content { padding-bottom: 16px; }
+}
+
+/* ── PWA: quando rodando como app instalado ────────────────── */
+@media (display-mode: standalone) {
+  /* Top bar já cobre a status bar via safe-area no html */
+  .top-bar { padding-top: 0; }
 }
 
 /* ── Checklist condições ────────────────────────────────────── */
