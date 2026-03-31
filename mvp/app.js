@@ -228,6 +228,9 @@ let currentOSId = null; // OS sendo visualizada
 let patternSequence = []; // dots selecionados no padrão 3x3
 let itemRowCount = 0;
 
+// ── GPS state ────────────────────────────────────────────────────
+let _gpsCache = null; // { lat, lon, cidade } — reutilizado entre fotos da mesma OS
+
 // ── Utils ──────────────────────────────────────────────────────
 function formatCurrency(v) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
@@ -518,6 +521,7 @@ function startNovaOS() {
   currentStep = 1;
   patternSequence = [];
   itemRowCount = 0;
+  _gpsCache = null; // reseta GPS para buscar posição fresca a cada nova OS
   document.getElementById('form-nova-os').reset();
   document.getElementById('photo-previews').innerHTML = '';
   document.getElementById('photo-count').textContent = '0';
@@ -816,6 +820,58 @@ function generateOS() {
   navigate('screen-os-view');
 }
 
+// ── GPS ────────────────────────────────────────────────────────
+
+/**
+ * Retorna { lat, lon, locStr } com a localização atual.
+ * Usa cache da sessão para não pedir permissão a cada foto.
+ * Nunca lança exceção — retorna locStr de fallback em caso de erro.
+ */
+async function getGPS() {
+  if (_gpsCache) return _gpsCache;
+
+  if (!navigator.geolocation) {
+    _gpsCache = { lat: null, lon: null, locStr: 'Localização indisponível' };
+    return _gpsCache;
+  }
+
+  try {
+    const pos = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true,
+        timeout: 8000,
+        maximumAge: 60000, // aceita posição com até 1 min de cache do sistema
+      });
+    });
+
+    const lat = pos.coords.latitude;
+    const lon = pos.coords.longitude;
+
+    // Geocodificação reversa via Nominatim (OpenStreetMap, gratuito, sem chave)
+    let locStr = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+    try {
+      const r = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1`,
+        { headers: { 'Accept-Language': 'pt-BR' } }
+      );
+      if (r.ok) {
+        const data = await r.json();
+        const a = data.address || {};
+        const cidade = a.city || a.town || a.village || a.county || '';
+        const estado = a.state_code || a.state || '';
+        locStr = cidade && estado ? `${cidade}, ${estado}` : (cidade || locStr);
+      }
+    } catch (_) { /* usa coordenadas brutas se Nominatim falhar */ }
+
+    _gpsCache = { lat, lon, locStr };
+    return _gpsCache;
+  } catch (err) {
+    const msg = err.code === 1 ? 'GPS negado pelo usuário' : 'GPS indisponível';
+    _gpsCache = { lat: null, lon: null, locStr: msg };
+    return _gpsCache;
+  }
+}
+
 // ── Câmera & Canvas Timestamp ──────────────────────────────────
 async function handlePhotoCapture(input) {
   const files = Array.from(input.files);
@@ -824,10 +880,16 @@ async function handlePhotoCapture(input) {
   const remaining = 5 - wizardData.fotos.length;
   const toProcess = files.slice(0, remaining);
 
+  // Busca GPS uma única vez para todas as fotos do lote
+  const gps = await getGPS();
+  if (gps.lat === null) {
+    showToast(`GPS: ${gps.locStr} — foto registrada sem coordenadas`, 'warning');
+  }
+
   for (const file of toProcess) {
     try {
       const dataUrl = await fileToDataUrl(file);
-      const stamped = await stampTimestamp(dataUrl);
+      const stamped = await stampTimestamp(dataUrl, gps);
       wizardData.fotos.push(stamped);
     } catch (e) {
       console.error('Erro ao processar foto:', e);
@@ -837,7 +899,8 @@ async function handlePhotoCapture(input) {
   input.value = ''; // permite reutilizar o input
   renderPhotoPreviews();
   document.getElementById('photo-count').textContent = wizardData.fotos.length;
-  showToast(`${toProcess.length} foto(s) adicionada(s) com carimbo de data/hora`, 'success');
+  const locLabel = gps.lat !== null ? `📍 ${gps.locStr}` : 'sem GPS';
+  showToast(`${toProcess.length} foto(s) com carimbo — ${locLabel}`, 'success');
 }
 
 function fileToDataUrl(file) {
@@ -849,7 +912,7 @@ function fileToDataUrl(file) {
   });
 }
 
-function stampTimestamp(dataUrl) {
+function stampTimestamp(dataUrl, gps) {
   return new Promise((res) => {
     const img = new Image();
     img.onload = () => {
@@ -862,15 +925,20 @@ function stampTimestamp(dataUrl) {
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, w, h);
 
-      // Timestamp
+      // Timestamp + GPS
       const now      = new Date();
       const dateStr  = now.toLocaleDateString('pt-BR');
       const timeStr  = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      const locStr   = 'São Paulo, SP'; // GPS simulado
+      const locStr   = (gps && gps.locStr) ? gps.locStr : 'GPS indisponível';
+      const coordStr = (gps && gps.lat !== null) ? `${gps.lat.toFixed(5)}, ${gps.lon.toFixed(5)}` : null;
 
       const fontSize = Math.max(12, Math.round(w / 40));
       ctx.font       = `bold ${fontSize}px Inter, sans-serif`;
-      const lines    = [`📅 ${dateStr} ${timeStr}`, `📍 ${locStr}`];
+      const lines    = [
+        `📅 ${dateStr} ${timeStr}`,
+        `📍 ${locStr}`,
+        ...(coordStr ? [`   ${coordStr}`] : []),
+      ];
       const padding  = 10;
       const lineH    = fontSize + 6;
       const boxH     = lines.length * lineH + padding * 2;
