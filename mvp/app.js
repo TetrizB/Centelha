@@ -1159,22 +1159,23 @@ function printOS() {
 // ── NFS-e ──────────────────────────────────────────────────────
 function openNFSe(id) {
   const os = state.getById(id || currentOSId);
-  if (!os) return;
-  currentOSId = os.id;
 
   // Prestador — dados do perfil da empresa
   const p = currentProfile || {};
-  document.getElementById('nfse-prestador-razao').value = p.razao_social  || '';
-  document.getElementById('nfse-prestador-cnpj').value  = p.cnpj_cpf      || '';
+  document.getElementById('nfse-prestador-razao').value = p.razao_social       || '';
+  document.getElementById('nfse-prestador-cnpj').value  = p.cnpj_cpf           || '';
   document.getElementById('nfse-prestador-im').value    = p.inscricao_municipal || '';
   document.getElementById('nfse-iss-aliq').value        = (p.aliquota_iss ?? 2).toFixed(1);
-  document.getElementById('nfse-municipio').value       = p.cidade         || '';
+  document.getElementById('nfse-municipio').value       = p.cidade              || '';
 
-  // Tomador — dados da OS
-  document.getElementById('nfse-tomador-nome').value    = os.cliente;
-  document.getElementById('nfse-tomador-tel').value     = os.telefone;
-  document.getElementById('nfse-servico-desc').value    = `${os.tipo} — ${os.marca}: ${os.defeito}`;
-  document.getElementById('nfse-valor').value           = (os.valor || 0).toFixed(2);
+  // Tomador — dados da OS (se houver OS selecionada)
+  if (os) {
+    currentOSId = os.id;
+    document.getElementById('nfse-tomador-nome').value = os.cliente;
+    document.getElementById('nfse-tomador-tel').value  = os.telefone;
+    document.getElementById('nfse-servico-desc').value = `${os.tipo} — ${os.marca}: ${os.defeito}`;
+    document.getElementById('nfse-valor').value        = (os.valor || 0).toFixed(2);
+  }
 
   document.getElementById('nfse-success').classList.remove('show');
   document.getElementById('nfse-form-inner').style.display = 'block';
