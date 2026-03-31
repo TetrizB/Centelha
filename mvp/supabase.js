@@ -56,6 +56,30 @@ async function dbLoadAll() {
   return data.map(r => r.dados);
 }
 
+// ── Perfil da Empresa ───────────────────────────────────────────
+
+async function dbLoadProfile() {
+  const { data, error } = await db
+    .from('company_profiles')
+    .select('*')
+    .single();
+  if (error && error.code !== 'PGRST116') {
+    console.error('[Supabase] Erro ao carregar perfil:', error.message);
+  }
+  return data || null;
+}
+
+async function dbSaveProfile(profile) {
+  const { data: { session } } = await db.auth.getSession();
+  if (!session) return { error: 'Sem sessão' };
+  const { error } = await db
+    .from('company_profiles')
+    .upsert({ ...profile, user_id: session.user.id, updated_at: new Date().toISOString() });
+  return { error };
+}
+
+// ── Dados ───────────────────────────────────────────────────────
+
 async function dbSave(os) {
   const { data: { session } } = await db.auth.getSession();
   if (!session) return;

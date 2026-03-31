@@ -144,6 +144,10 @@ class AppState {
 // ── Instância global do state ───────────────────────────────────
 const state = new AppState();
 
+// ── Perfil da empresa (multi-tenant) ───────────────────────────
+let currentProfile  = null;
+let configAmbiente  = 'homologacao';
+
 // ── Auth & Init ─────────────────────────────────────────────────
 
 function showLoginScreen() {
@@ -178,26 +182,41 @@ async function handleLogin() {
   }
 
   showApp();
-  const remoteOS = await dbLoadAll();
-  if (remoteOS && remoteOS.length > 0) state.mergeFromCloud(remoteOS);
-  renderDashboard();
+  await postLoginSetup();
 }
 
 async function handleLogout() {
   await dbSignOut();
   localStorage.removeItem('oficina_pro_os');
-  state._os = [];
+  state._os      = [];
+  currentProfile = null;
+  document.body.classList.remove('onboarding-mode');
   showLoginScreen();
+}
+
+async function postLoginSetup() {
+  currentProfile = await dbLoadProfile();
+
+  if (!currentProfile || !currentProfile.perfil_completo) {
+    document.body.classList.add('onboarding-mode');
+    document.getElementById('onboarding-badge').classList.remove('hidden');
+    document.getElementById('btn-salvar-config').textContent = 'Salvar e Começar →';
+    document.getElementById('btn-config-voltar').classList.add('hidden');
+    renderSettings();
+    navigate('screen-configuracoes');
+    return;
+  }
+
+  const remoteOS = await dbLoadAll();
+  if (remoteOS && remoteOS.length > 0) state.mergeFromCloud(remoteOS);
+  renderDashboard();
 }
 
 async function initApp() {
   const session = await dbGetSession();
   if (!session) { showLoginScreen(); return; }
-
   showApp();
-  const remoteOS = await dbLoadAll();
-  if (remoteOS && remoteOS.length > 0) state.mergeFromCloud(remoteOS);
-  renderDashboard();
+  await postLoginSetup();
 }
 
 initApp();
@@ -249,6 +268,201 @@ function navigate(screenId) {
   if (navBtn) navBtn.classList.add('active');
 
   window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── Configurações / Perfil ─────────────────────────────────────
+
+function checkProfileComplete() {
+  if (!currentProfile || !currentProfile.perfil_completo) {
+    showToast('Configure os dados da empresa antes de continuar.', 'error');
+    document.body.classList.add('onboarding-mode');
+    document.getElementById('onboarding-badge').classList.remove('hidden');
+    document.getElementById('btn-salvar-config').textContent = 'Salvar e Começar →';
+    document.getElementById('btn-config-voltar').classList.add('hidden');
+    renderSettings();
+    navigate('screen-configuracoes');
+    return false;
+  }
+  return true;
+}
+
+function switchConfigTab(tab) {
+  ['empresa', 'endereco', 'os', 'fiscal'].forEach(t => {
+    document.getElementById(`ctab-${t}`).classList.toggle('active', t === tab);
+    document.getElementById(`config-panel-${t}`).classList.toggle('hidden', t !== tab);
+  });
+}
+
+function setAmbiente(val) {
+  configAmbiente = val;
+  document.getElementById('btn-homologacao').classList.toggle('active', val === 'homologacao');
+  document.getElementById('btn-producao').classList.toggle('active', val === 'producao');
+  document.getElementById('ambiente-hint').textContent = val === 'producao'
+    ? '⚠️ Modo Produção: NFS-e emitidas terão validade fiscal real'
+    : 'Use Homologação para testes antes de emitir notas reais';
+}
+
+function renderSettings() {
+  const p = currentProfile || {};
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+
+  set('cfg-nome-fantasia', p.nome_fantasia);
+  set('cfg-razao-social',  p.razao_social);
+  set('cfg-cnpj-cpf',      p.cnpj_cpf);
+  set('cfg-telefone',      p.telefone);
+  set('cfg-cep',           p.cep);
+  set('cfg-logradouro',    p.logradouro);
+  set('cfg-numero',        p.numero);
+  set('cfg-complemento',   p.complemento);
+  set('cfg-bairro',        p.bairro);
+  set('cfg-cidade',        p.cidade);
+  set('cfg-estado',        p.estado);
+  set('cfg-termos',        p.termos_garantia);
+  set('cfg-observacoes',   p.observacoes_padrao);
+  set('cfg-rodape',        p.rodape);
+  set('cfg-iss',           p.aliquota_iss ?? 2.0);
+  set('cfg-cert',          p.cert_digital_path);
+  set('cfg-serie',         p.nfse_serie || '1');
+  set('cfg-nf-num',        p.nfse_numero_inicial || 1);
+
+  const regime = document.getElementById('cfg-regime');
+  if (regime) regime.value = p.regime_tributario || 'mei';
+
+  if (p.logo_base64) {
+    document.getElementById('logo-preview').src = p.logo_base64;
+    document.getElementById('logo-preview').classList.remove('hidden');
+    document.getElementById('logo-placeholder').classList.add('hidden');
+  } else {
+    document.getElementById('logo-preview').classList.add('hidden');
+    document.getElementById('logo-placeholder').classList.remove('hidden');
+  }
+
+  setAmbiente(p.ambiente_emissao || 'homologacao');
+  switchConfigTab('empresa');
+}
+
+async function saveProfileData() {
+  const nome_fantasia = document.getElementById('cfg-nome-fantasia').value.trim();
+  const razao_social  = document.getElementById('cfg-razao-social').value.trim();
+  const cnpj_cpf      = document.getElementById('cfg-cnpj-cpf').value.trim();
+
+  if (!nome_fantasia || !razao_social || !cnpj_cpf) {
+    showToast('Preencha os campos obrigatórios: Nome Fantasia, Razão Social e CNPJ/CPF', 'error');
+    switchConfigTab('empresa');
+    return;
+  }
+
+  const logoEl  = document.getElementById('logo-preview');
+  const logoB64 = !logoEl.classList.contains('hidden') ? logoEl.src : '';
+
+  const profile = {
+    nome_fantasia,
+    razao_social,
+    cnpj_cpf,
+    telefone:            document.getElementById('cfg-telefone').value.trim(),
+    logo_base64:         logoB64,
+    cep:                 document.getElementById('cfg-cep').value.trim(),
+    logradouro:          document.getElementById('cfg-logradouro').value.trim(),
+    numero:              document.getElementById('cfg-numero').value.trim(),
+    complemento:         document.getElementById('cfg-complemento').value.trim(),
+    bairro:              document.getElementById('cfg-bairro').value.trim(),
+    cidade:              document.getElementById('cfg-cidade').value.trim(),
+    estado:              document.getElementById('cfg-estado').value.trim(),
+    termos_garantia:     document.getElementById('cfg-termos').value.trim(),
+    observacoes_padrao:  document.getElementById('cfg-observacoes').value.trim(),
+    rodape:              document.getElementById('cfg-rodape').value.trim(),
+    regime_tributario:   document.getElementById('cfg-regime').value,
+    aliquota_iss:        parseFloat(document.getElementById('cfg-iss').value) || 2.0,
+    cert_digital_path:   document.getElementById('cfg-cert').value.trim(),
+    ambiente_emissao:    configAmbiente,
+    nfse_serie:          document.getElementById('cfg-serie').value.trim() || '1',
+    nfse_numero_inicial: parseInt(document.getElementById('cfg-nf-num').value) || 1,
+    perfil_completo:     true,
+  };
+
+  const btn = document.getElementById('btn-salvar-config');
+  btn.disabled    = true;
+  btn.textContent = 'Salvando...';
+
+  const { error } = await dbSaveProfile(profile);
+
+  btn.disabled = false;
+
+  if (error) {
+    showToast('Erro ao salvar. Tente novamente.', 'error');
+    btn.textContent = document.body.classList.contains('onboarding-mode') ? 'Salvar e Começar →' : 'Salvar Configurações';
+    return;
+  }
+
+  currentProfile = profile;
+  showToast('Configurações salvas com sucesso!', 'success');
+
+  if (document.body.classList.contains('onboarding-mode')) {
+    document.body.classList.remove('onboarding-mode');
+    document.getElementById('onboarding-badge').classList.add('hidden');
+    document.getElementById('btn-config-voltar').classList.remove('hidden');
+    btn.textContent = 'Salvar Configurações';
+    const remoteOS = await dbLoadAll();
+    if (remoteOS && remoteOS.length > 0) state.mergeFromCloud(remoteOS);
+    renderDashboard();
+    navigate('screen-dashboard');
+  } else {
+    btn.textContent = 'Salvar Configurações';
+  }
+}
+
+async function lookupCEP() {
+  const cep = document.getElementById('cfg-cep').value.replace(/\D/g, '');
+  if (cep.length !== 8) { showToast('CEP inválido.', 'error'); return; }
+
+  const btn = document.getElementById('btn-buscar-cep');
+  btn.textContent = '...';
+  btn.disabled    = true;
+
+  try {
+    const resp = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+    const data = await resp.json();
+    if (data.erro) { showToast('CEP não encontrado.', 'error'); return; }
+    document.getElementById('cfg-logradouro').value = data.logradouro || '';
+    document.getElementById('cfg-bairro').value     = data.bairro     || '';
+    document.getElementById('cfg-cidade').value     = data.localidade || '';
+    document.getElementById('cfg-estado').value     = data.uf         || '';
+    document.getElementById('cfg-numero').focus();
+  } catch { showToast('Erro ao buscar CEP.', 'error'); }
+  finally {
+    btn.textContent = 'Buscar';
+    btn.disabled    = false;
+  }
+}
+
+function handleCEPInput(el) {
+  let v = el.value.replace(/\D/g, '').substring(0, 8);
+  if (v.length > 5) v = v.replace(/(\d{5})(\d)/, '$1-$2');
+  el.value = v;
+  if (v.replace('-', '').length === 8) lookupCEP();
+}
+
+function handleLogoUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const MAX = 300;
+      let w = img.width, h = img.height;
+      if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      document.getElementById('logo-preview').src = canvas.toDataURL('image/png', 0.9);
+      document.getElementById('logo-preview').classList.remove('hidden');
+      document.getElementById('logo-placeholder').classList.add('hidden');
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+  input.value = '';
 }
 
 // ── Dashboard ──────────────────────────────────────────────────
@@ -591,6 +805,7 @@ function buildSummary() {
 }
 
 function generateOS() {
+  if (!checkProfileComplete()) return;
   const os = state.create(wizardData);
   showToast(`${os.id} criada com sucesso!`, 'success');
   renderDashboard();
@@ -737,7 +952,7 @@ function renderOSView(id) {
     (os.previsao ? `📅 Previsão de entrega: ${new Date(os.previsao + 'T12:00:00').toLocaleDateString('pt-BR')}\n` : '') +
     `\n` +
     `✅ *Para assinar a OS digitalmente, responda: CONFIRMO*\n` +
-    `Ao confirmar, você aceita os termos e condições da ${OFICINA.razao}.`
+    `Ao confirmar, você aceita os termos e condições da ${currentProfile?.razao_social || 'nossa empresa'}.`
   );
   const wppUrl = `https://wa.me/55${os.telefone.replace(/\D/g,'')}?text=${wppMsg}`;
 
@@ -815,21 +1030,27 @@ function renderOSView(id) {
 
         <div class="os-doc-section">
           <h4>🏢 Prestador</h4>
-          <div class="os-field-row"><span class="os-field-label">Empresa</span><span class="os-field-value" style="font-size:.78rem">${OFICINA.razao}</span></div>
-          <div class="os-field-row"><span class="os-field-label">CNPJ</span><span class="os-field-value">${OFICINA.cnpj}</span></div>
-          <div class="os-field-row"><span class="os-field-label">Endereço</span><span class="os-field-value" style="font-size:.75rem">${OFICINA.endereco}</span></div>
-          <div class="os-field-row"><span class="os-field-label">Telefone</span><span class="os-field-value">${OFICINA.telefone}</span></div>
+          ${currentProfile?.logo_base64 ? `<img src="${currentProfile.logo_base64}" alt="Logo" style="max-height:48px;margin-bottom:8px;border-radius:4px">` : ''}
+          <div class="os-field-row"><span class="os-field-label">Empresa</span><span class="os-field-value" style="font-size:.78rem">${currentProfile?.razao_social || '—'}</span></div>
+          ${currentProfile?.nome_fantasia && currentProfile.nome_fantasia !== currentProfile.razao_social ? `<div class="os-field-row"><span class="os-field-label">Nome Fantasia</span><span class="os-field-value" style="font-size:.78rem">${currentProfile.nome_fantasia}</span></div>` : ''}
+          <div class="os-field-row"><span class="os-field-label">CNPJ/CPF</span><span class="os-field-value">${currentProfile?.cnpj_cpf || '—'}</span></div>
+          ${currentProfile?.logradouro ? `<div class="os-field-row"><span class="os-field-label">Endereço</span><span class="os-field-value" style="font-size:.75rem">${currentProfile.logradouro}${currentProfile.numero ? ', ' + currentProfile.numero : ''}${currentProfile.bairro ? ' — ' + currentProfile.bairro : ''}${currentProfile.cidade ? ', ' + currentProfile.cidade + '/' + currentProfile.estado : ''}</span></div>` : ''}
+          ${currentProfile?.telefone ? `<div class="os-field-row"><span class="os-field-label">Telefone</span><span class="os-field-value">${currentProfile.telefone}</span></div>` : ''}
         </div>
 
         <div class="os-doc-section" style="background:#fafbfc;border-radius:8px;padding:10px 12px;border:1px solid #e2e8f0">
           <h4 style="font-size:.78rem;margin-bottom:6px;opacity:.8">⚖️ Termos e Condições</h4>
-          <ol style="padding-left:14px;display:flex;flex-direction:column;gap:3px">
-            <li style="font-size:.7rem;color:var(--muted)">Garantia de 90 dias para os serviços realizados.</li>
-            <li style="font-size:.7rem;color:var(--muted)">Garantia de peças válida somente contra defeitos de fabricação.</li>
-            <li style="font-size:.7rem;color:var(--muted)">Não cobertura de defeitos por mau uso, quedas ou desgaste.</li>
-            <li style="font-size:.7rem;color:var(--muted)">Aparelho testado antecipadamente na entrada e saída.</li>
-            <li style="font-size:.7rem;color:var(--muted)">Mercadorias não retiradas em 60 dias poderão ser vendidas para cobrir custos.</li>
-          </ol>
+          ${currentProfile?.termos_garantia
+            ? `<p style="font-size:.7rem;color:var(--muted);white-space:pre-line">${currentProfile.termos_garantia}</p>`
+            : `<ol style="padding-left:14px;display:flex;flex-direction:column;gap:3px">
+                <li style="font-size:.7rem;color:var(--muted)">Garantia de 90 dias para os serviços realizados.</li>
+                <li style="font-size:.7rem;color:var(--muted)">Garantia de peças válida somente contra defeitos de fabricação.</li>
+                <li style="font-size:.7rem;color:var(--muted)">Não cobertura de defeitos por mau uso, quedas ou desgaste.</li>
+                <li style="font-size:.7rem;color:var(--muted)">Aparelho testado antecipadamente na entrada e saída.</li>
+                <li style="font-size:.7rem;color:var(--muted)">Mercadorias não retiradas em 60 dias poderão ser vendidas para cobrir custos.</li>
+               </ol>`}
+          ${currentProfile?.observacoes_padrao ? `<p style="font-size:.7rem;color:var(--muted);margin-top:6px;white-space:pre-line">${currentProfile.observacoes_padrao}</p>` : ''}
+          ${currentProfile?.rodape ? `<p style="font-size:.72rem;color:var(--muted);margin-top:8px;text-align:center;font-style:italic">${currentProfile.rodape}</p>` : ''}
         </div>
 
       </div>
@@ -883,6 +1104,7 @@ function openNFSe(id) {
 }
 
 async function emitirNFSe() {
+  if (!checkProfileComplete()) return;
   const btn = document.getElementById('btn-emitir-nfse');
   btn.innerHTML = '<span class="spinner"></span> Enviando para ABRASF...';
   btn.disabled = true;

@@ -51,7 +51,7 @@
       <span>OficinaPRO</span>
     </div>
     <div class="nav-actions">
-      <button class="icon-btn" title="Configurações da oficina" onclick="alert('Em breve: perfil e configurações da oficina')">
+      <button class="icon-btn" title="Configurações da oficina" onclick="navigate('screen-configuracoes'); renderSettings()">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
         </svg>
@@ -634,6 +634,163 @@
           <strong>Insight:</strong> Troca de bateria e desbloqueio/IMEI têm a maior margem por hora. Priorize-os quando a agenda estiver cheia para maximizar faturamento diário.
         </p>
       </div>
+
+    </section>
+
+    <!-- ════════════════════════════════════════════════════
+         TELA — CONFIGURAÇÕES DA EMPRESA
+    ════════════════════════════════════════════════════ -->
+    <section id="screen-configuracoes" class="screen">
+
+      <div class="config-header">
+        <div id="onboarding-badge" class="onboarding-badge hidden">Configuração Inicial</div>
+        <h2 class="config-title">Configurações da Empresa</h2>
+        <p class="config-subtitle">Personalize o app para a sua empresa</p>
+      </div>
+
+      <!-- Tabs -->
+      <div class="config-tabs">
+        <button class="config-tab active" id="ctab-empresa"  onclick="switchConfigTab('empresa')">🏢 Empresa</button>
+        <button class="config-tab"        id="ctab-endereco" onclick="switchConfigTab('endereco')">📍 Endereço</button>
+        <button class="config-tab"        id="ctab-os"       onclick="switchConfigTab('os')">📋 OS</button>
+        <button class="config-tab"        id="ctab-fiscal"   onclick="switchConfigTab('fiscal')">🧾 Fiscal</button>
+      </div>
+
+      <!-- ── Tab: Empresa ── -->
+      <div id="config-panel-empresa" class="config-panel">
+        <div class="form-group">
+          <label class="form-label">Nome Fantasia <span class="required">*</span></label>
+          <input id="cfg-nome-fantasia" class="form-input" type="text" placeholder="Ex: TechFix Assistência">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Razão Social <span class="required">*</span></label>
+          <input id="cfg-razao-social" class="form-input" type="text" placeholder="Ex: TechFix Assistência Técnica LTDA">
+        </div>
+        <div class="form-group">
+          <label class="form-label">CNPJ / CPF <span class="required">*</span></label>
+          <input id="cfg-cnpj-cpf" class="form-input" type="text" placeholder="00.000.000/0001-00">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Telefone de Contato</label>
+          <input id="cfg-telefone" class="form-input" type="tel" placeholder="(00) 00000-0000">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Logotipo (cabeçalho da OS)</label>
+          <div class="logo-upload-area" id="logo-upload-area" onclick="document.getElementById('logo-file-input').click()">
+            <img id="logo-preview" src="" alt="Logo" class="logo-preview hidden">
+            <div id="logo-placeholder">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              <span>Toque para selecionar imagem</span>
+            </div>
+          </div>
+          <input id="logo-file-input" type="file" accept="image/*" class="hidden" onchange="handleLogoUpload(this)">
+        </div>
+      </div>
+
+      <!-- ── Tab: Endereço ── -->
+      <div id="config-panel-endereco" class="config-panel hidden">
+        <div class="cep-row">
+          <div class="form-group" style="flex:1;margin-bottom:0">
+            <label class="form-label">CEP <span class="required">*</span></label>
+            <input id="cfg-cep" class="form-input" type="text" placeholder="00000-000" maxlength="9" oninput="handleCEPInput(this)">
+          </div>
+          <button class="btn btn-outline" id="btn-buscar-cep" onclick="lookupCEP()" style="height:44px;align-self:flex-end">Buscar</button>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Logradouro</label>
+          <input id="cfg-logradouro" class="form-input" type="text" placeholder="Rua, Av., Travessa...">
+        </div>
+        <div style="display:flex;gap:12px">
+          <div class="form-group" style="flex:0 0 90px">
+            <label class="form-label">Número</label>
+            <input id="cfg-numero" class="form-input" type="text" placeholder="123">
+          </div>
+          <div class="form-group" style="flex:1">
+            <label class="form-label">Complemento</label>
+            <input id="cfg-complemento" class="form-input" type="text" placeholder="Sala, Apto...">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Bairro</label>
+          <input id="cfg-bairro" class="form-input" type="text" placeholder="Bairro">
+        </div>
+        <div style="display:flex;gap:12px">
+          <div class="form-group" style="flex:1">
+            <label class="form-label">Cidade</label>
+            <input id="cfg-cidade" class="form-input" type="text" placeholder="São Paulo">
+          </div>
+          <div class="form-group" style="flex:0 0 72px">
+            <label class="form-label">UF</label>
+            <input id="cfg-estado" class="form-input" type="text" placeholder="SP" maxlength="2" style="text-transform:uppercase">
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Tab: OS ── -->
+      <div id="config-panel-os" class="config-panel hidden">
+        <div class="form-group">
+          <label class="form-label">Termos de Garantia</label>
+          <textarea id="cfg-termos" class="form-input" rows="5"
+            placeholder="Ex: Garantia de 90 dias para peças e serviços realizados..."></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Observações Padrão</label>
+          <textarea id="cfg-observacoes" class="form-input" rows="3"
+            placeholder="Texto que aparece em todas as OS..."></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Rodapé da OS</label>
+          <input id="cfg-rodape" class="form-input" type="text" placeholder="Ex: Agradecemos a preferência!">
+        </div>
+      </div>
+
+      <!-- ── Tab: Fiscal ── -->
+      <div id="config-panel-fiscal" class="config-panel hidden">
+        <div class="form-group">
+          <label class="form-label">Regime Tributário</label>
+          <select id="cfg-regime" class="form-input">
+            <option value="mei">MEI</option>
+            <option value="simples">Simples Nacional</option>
+            <option value="lucro_presumido">Lucro Presumido</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Alíquota ISS (%)</label>
+          <input id="cfg-iss" class="form-input" type="number" min="0" max="10" step="0.01" placeholder="2.00">
+          <small class="form-hint">Confira a alíquota do seu município</small>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Caminho do Certificado Digital (.pfx)</label>
+          <input id="cfg-cert" class="form-input" type="text" placeholder="/caminho/certificado.pfx">
+          <small class="form-hint">Necessário para emissão eletrônica de NFS-e</small>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Ambiente de Emissão</label>
+          <div class="toggle-row">
+            <button id="btn-homologacao" class="toggle-btn active" onclick="setAmbiente('homologacao')">🧪 Homologação</button>
+            <button id="btn-producao"    class="toggle-btn"        onclick="setAmbiente('producao')">🚀 Produção</button>
+          </div>
+          <small class="form-hint" id="ambiente-hint">Use Homologação para testes antes de emitir notas reais</small>
+        </div>
+        <div style="display:flex;gap:12px">
+          <div class="form-group" style="flex:0 0 80px">
+            <label class="form-label">Série</label>
+            <input id="cfg-serie" class="form-input" type="text" placeholder="1">
+          </div>
+          <div class="form-group" style="flex:1">
+            <label class="form-label">Próximo Nº NF</label>
+            <input id="cfg-nf-num" class="form-input" type="number" min="1" placeholder="1">
+            <small class="form-hint">Para continuidade de sistemas anteriores</small>
+          </div>
+        </div>
+      </div>
+
+      <button id="btn-salvar-config" class="btn btn-primary btn-full btn-lg" style="margin-top:24px" onclick="saveProfileData()">
+        Salvar Configurações
+      </button>
+      <button id="btn-config-voltar" class="btn btn-ghost btn-full" style="margin-top:8px" onclick="navigate('screen-dashboard')">
+        ← Voltar sem salvar
+      </button>
 
     </section>
 
