@@ -4,13 +4,17 @@
 
    SQL necessário — execute no SQL Editor do Supabase:
 
-   -- 1. Adiciona coluna de dono na tabela
-   ALTER TABLE ordens_servico ADD COLUMN user_id UUID REFERENCES auth.users(id);
+   -- 1. Adiciona coluna de dono na tabela (se ainda não existir)
+   ALTER TABLE ordens_servico ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id);
 
-   -- 2. Remove a policy aberta anterior
+   -- 2. Garante que id (texto) é único para o upsert funcionar corretamente
+   ALTER TABLE ordens_servico ADD COLUMN IF NOT EXISTS id TEXT;
+   ALTER TABLE ordens_servico ADD CONSTRAINT IF NOT EXISTS ordens_servico_id_unique UNIQUE (id);
+
+   -- 3. Remove a policy aberta anterior
    DROP POLICY IF EXISTS "acesso publico" ON ordens_servico;
 
-   -- 3. Cria policy que isola dados por empresa
+   -- 4. Cria policy que isola dados por empresa
    CREATE POLICY "empresa ve so suas OS" ON ordens_servico
      FOR ALL
      USING  (auth.uid() = user_id)
@@ -53,7 +57,7 @@ async function dbLoadAll() {
     console.error('[Supabase] Erro ao carregar OS:', error.message);
     return null;
   }
-  return data.map(r => r.dados);
+  return data.map(r => r.dados).filter(Boolean);
 }
 
 // ── Perfil da Empresa ───────────────────────────────────────────
@@ -93,7 +97,7 @@ async function dbSave(os) {
       data_criacao: os.dataCriacao,
       user_id:      session.user.id,
       dados:        os,
-    });
+    }, { onConflict: 'id' });
 
   if (error) console.error('[Supabase] Erro ao salvar OS:', error.message);
 }

@@ -112,7 +112,7 @@ class AppState {
     };
     this._os.push(os);
     this._save();
-    if (typeof dbSave === 'function') dbSave(os);
+    if (typeof dbSave === 'function') dbSave(os).catch(e => console.error('[sync] Falha ao salvar OS:', e));
     return os;
   }
 
@@ -121,7 +121,7 @@ class AppState {
     if (idx === -1) return;
     this._os[idx] = { ...this._os[idx], ...patch };
     this._save();
-    if (typeof dbSave === 'function') dbSave(this._os[idx]);
+    if (typeof dbSave === 'function') dbSave(this._os[idx]).catch(e => console.error('[sync] Falha ao atualizar OS:', e));
     return this._os[idx];
   }
 
@@ -208,7 +208,7 @@ async function postLoginSetup() {
   }
 
   const remoteOS = await dbLoadAll();
-  if (remoteOS && remoteOS.length > 0) state.mergeFromCloud(remoteOS);
+  if (remoteOS !== null) state.mergeFromCloud(remoteOS);
   renderDashboard();
 }
 
@@ -403,7 +403,7 @@ async function saveProfileData() {
     document.getElementById('btn-config-voltar').classList.remove('hidden');
     btn.textContent = 'Salvar Configurações';
     const remoteOS = await dbLoadAll();
-    if (remoteOS && remoteOS.length > 0) state.mergeFromCloud(remoteOS);
+    if (remoteOS !== null) state.mergeFromCloud(remoteOS);
     renderDashboard();
     navigate('screen-dashboard');
   } else {
