@@ -1,19 +1,20 @@
 /* ============================================================
    OficinaPRO — supabase.js
-   Integração com Supabase (persistência em nuvem)
+   Integração com Supabase: persistência + autenticação
 
-   Tabela necessária — execute no SQL Editor do Supabase:
+   SQL necessário — execute no SQL Editor do Supabase:
 
-   CREATE TABLE ordens_servico (
-     id           TEXT PRIMARY KEY,
-     numero       INTEGER NOT NULL,
-     status       TEXT NOT NULL DEFAULT 'aguardando',
-     data_criacao TIMESTAMPTZ NOT NULL,
-     dados        JSONB NOT NULL
-   );
-   ALTER TABLE ordens_servico ENABLE ROW LEVEL SECURITY;
-   CREATE POLICY "acesso publico" ON ordens_servico
-     FOR ALL USING (true) WITH CHECK (true);
+   -- 1. Adiciona coluna de dono na tabela
+   ALTER TABLE ordens_servico ADD COLUMN user_id UUID REFERENCES auth.users(id);
+
+   -- 2. Remove a policy aberta anterior
+   DROP POLICY IF EXISTS "acesso publico" ON ordens_servico;
+
+   -- 3. Cria policy que isola dados por empresa
+   CREATE POLICY "empresa ve so suas OS" ON ordens_servico
+     FOR ALL
+     USING  (auth.uid() = user_id)
+     WITH CHECK (auth.uid() = user_id);
 
    ============================================================ */
 
@@ -24,10 +25,24 @@ const SUPABASE_KEY = 'sb_publishable_ghjU1tbRqbdTIWCsuD-PnQ_ZRpk3ZpQ';
 
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-/**
- * Carrega todas as OS do Supabase.
- * Retorna um array de objetos OS ou null em caso de erro.
- */
+// ── Auth ────────────────────────────────────────────────────────
+
+async function dbGetSession() {
+  const { data: { session } } = await db.auth.getSession();
+  return session;
+}
+
+async function dbSignIn(email, password) {
+  const { data, error } = await db.auth.signInWithPassword({ email, password });
+  return { data, error };
+}
+
+async function dbSignOut() {
+  await db.auth.signOut();
+}
+
+// ── Dados ───────────────────────────────────────────────────────
+
 async function dbLoadAll() {
   const { data, error } = await db
     .from('ordens_servico')
@@ -41,10 +56,10 @@ async function dbLoadAll() {
   return data.map(r => r.dados);
 }
 
-/**
- * Salva (insert ou update) uma OS no Supabase.
- */
 async function dbSave(os) {
+  const { data: { session } } = await db.auth.getSession();
+  if (!session) return;
+
   const { error } = await db
     .from('ordens_servico')
     .upsert({
@@ -52,10 +67,9 @@ async function dbSave(os) {
       numero:       os.numero,
       status:       os.status,
       data_criacao: os.dataCriacao,
+      user_id:      session.user.id,
       dados:        os,
     });
 
-  if (error) {
-    console.error('[Supabase] Erro ao salvar OS:', error.message);
-  }
+  if (error) console.error('[Supabase] Erro ao salvar OS:', error.message);
 }

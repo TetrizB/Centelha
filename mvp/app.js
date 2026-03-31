@@ -144,15 +144,63 @@ class AppState {
 // ── Instância global do state ───────────────────────────────────
 const state = new AppState();
 
-// ── Sync inicial com Supabase ───────────────────────────────────
-(async () => {
-  if (typeof dbLoadAll !== 'function') return;
-  const remoteOS = await dbLoadAll();
-  if (remoteOS && remoteOS.length > 0) {
-    state.mergeFromCloud(remoteOS);
-    renderDashboard();
+// ── Auth & Init ─────────────────────────────────────────────────
+
+function showLoginScreen() {
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('app').classList.add('hidden');
+}
+
+function showApp() {
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+}
+
+async function handleLogin() {
+  const email    = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const btn      = document.getElementById('login-btn');
+  const errEl    = document.getElementById('login-error');
+
+  errEl.classList.add('hidden');
+  btn.disabled    = true;
+  btn.textContent = 'Entrando...';
+
+  const { error } = await dbSignIn(email, password);
+
+  btn.disabled    = false;
+  btn.textContent = 'Entrar';
+
+  if (error) {
+    errEl.textContent = 'Email ou senha incorretos.';
+    errEl.classList.remove('hidden');
+    return;
   }
-})();
+
+  showApp();
+  const remoteOS = await dbLoadAll();
+  if (remoteOS && remoteOS.length > 0) state.mergeFromCloud(remoteOS);
+  renderDashboard();
+}
+
+async function handleLogout() {
+  await dbSignOut();
+  localStorage.removeItem('oficina_pro_os');
+  state._os = [];
+  showLoginScreen();
+}
+
+async function initApp() {
+  const session = await dbGetSession();
+  if (!session) { showLoginScreen(); return; }
+
+  showApp();
+  const remoteOS = await dbLoadAll();
+  if (remoteOS && remoteOS.length > 0) state.mergeFromCloud(remoteOS);
+  renderDashboard();
+}
+
+initApp();
 
 // ── Wizard state ────────────────────────────────────────────────
 let wizardData = { fotos: [], condicoes: [], senhaParao: [], itens: [] };
