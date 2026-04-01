@@ -1344,7 +1344,9 @@ function renderLucratividade() {
         map[key].count++;
       }
     } else if ((os.valor || 0) > 0) {
-      const key = os.tipo || 'Outros';
+      // Usa o defeito/serviço descrito pelo técnico, truncado a 50 chars
+      const raw = (os.defeito || os.tipo || 'Outros').trim();
+      const key = raw.length > 50 ? raw.substring(0, 47) + '...' : raw;
       if (!map[key]) map[key] = { servico: key, faturado: 0, count: 0 };
       map[key].faturado += os.valor;
       map[key].count++;
