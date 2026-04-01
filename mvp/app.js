@@ -722,6 +722,9 @@ function updateWizardStep() {
   document.querySelectorAll('.wizard-step').forEach(s => s.classList.remove('active'));
   document.getElementById(`wizard-step-${currentStep}`).classList.add('active');
 
+  // Pré-carrega GPS ao entrar no passo 2 para que esteja pronto quando a foto for tirada
+  if (currentStep === 2 && !_gpsCache) getGPS();
+
   document.getElementById('btn-prev').classList.toggle('hidden', currentStep === 1);
   const btnNext = document.getElementById('btn-next');
   if (currentStep < total) {
@@ -882,8 +885,8 @@ async function getGPS() {
     const pos = await new Promise((resolve, reject) => {
       navigator.geolocation.getCurrentPosition(resolve, reject, {
         enableHighAccuracy: true,
-        timeout: 8000,
-        maximumAge: 60000, // aceita posição com até 1 min de cache do sistema
+        timeout: 5000,
+        maximumAge: 60000,
       });
     });
 
@@ -921,29 +924,46 @@ async function handlePhotoCapture(input) {
   if (!files.length) return;
 
   const remaining = 5 - wizardData.fotos.length;
+  if (remaining <= 0) { showToast('Limite de 5 fotos atingido.', 'error'); return; }
   const toProcess = files.slice(0, remaining);
 
-  // Busca GPS uma única vez para todas as fotos do lote
-  const gps = await getGPS();
-  if (gps.lat === null) {
-    showToast(`GPS: ${gps.locStr} — foto registrada sem coordenadas`, 'warning');
+  // Mostra feedback imediato para o usuário
+  showToast(`Processando ${toProcess.length} foto(s)...`, '');
+
+  // Usa GPS já em cache (pré-carregado ao entrar no passo 2).
+  // Se ainda não chegou, aguarda no máximo 1 segundo — nunca bloqueia a foto.
+  let gps;
+  if (_gpsCache) {
+    gps = _gpsCache;
+  } else {
+    const timeout = new Promise(r => setTimeout(() => r({ lat: null, lon: null, locStr: 'GPS indisponivel' }), 1000));
+    gps = await Promise.race([getGPS(), timeout]);
   }
 
+  let processadas = 0;
   for (const file of toProcess) {
     try {
       const dataUrl = await fileToDataUrl(file);
       const stamped = await stampTimestamp(dataUrl, gps);
       wizardData.fotos.push(stamped);
+      processadas++;
+      // Atualiza preview progressivamente (foto a foto)
+      renderPhotoPreviews();
+      document.getElementById('photo-count').textContent = wizardData.fotos.length;
     } catch (e) {
       console.error('Erro ao processar foto:', e);
     }
   }
 
   input.value = ''; // permite reutilizar o input
-  renderPhotoPreviews();
-  document.getElementById('photo-count').textContent = wizardData.fotos.length;
-  const locLabel = gps.lat !== null ? `📍 ${gps.locStr}` : 'sem GPS';
-  showToast(`${toProcess.length} foto(s) com carimbo — ${locLabel}`, 'success');
+
+  if (processadas === 0) {
+    showToast('Não foi possível processar a(s) foto(s). Tente novamente.', 'error');
+    return;
+  }
+
+  const locLabel = gps.lat !== null ? `GPS: ${gps.locStr}` : 'sem GPS';
+  showToast(`${processadas} foto(s) adicionada(s) — ${locLabel}`, 'success');
 }
 
 function fileToDataUrl(file) {
