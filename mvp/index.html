@@ -622,7 +622,7 @@
 
       <div style="margin-bottom:16px">
         <h2>Apoio à Decisão</h2>
-        <p style="font-size:.875rem;margin-top:4px">Ranking de serviços por lucratividade real (margem por hora trabalhada)</p>
+        <p style="font-size:.875rem;margin-top:4px">Ranking de serviços por faturamento real das suas ordens de serviço</p>
       </div>
 
       <!-- Gráfico de barras CSS puro -->
@@ -631,7 +631,7 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" style="display:inline;vertical-align:sub;margin-right:4px">
             <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
           </svg>
-          Top 7 — Margem por hora (R$/h)
+          Top 7 — Maior faturamento
         </h3>
         <div id="bar-chart" class="bar-chart"></div>
       </div>
@@ -642,18 +642,17 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" style="display:inline;vertical-align:sub;margin-right:4px">
             <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
           </svg>
-          Tabela completa de serviços
+          Ranking completo de serviços
         </h3>
         <div class="lucro-table-wrap">
           <table class="lucro-table">
             <thead>
               <tr>
                 <th>#</th>
-                <th>Serviço</th>
-                <th>Preço</th>
-                <th>Tempo</th>
-                <th>Margem/h</th>
-                <th>Margem</th>
+                <th>Serviço / Tipo</th>
+                <th>OS</th>
+                <th>Faturado</th>
+                <th>% Total</th>
               </tr>
             </thead>
             <tbody id="lucro-tbody"></tbody>
@@ -666,7 +665,7 @@
           <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
         </svg>
         <p>
-          <strong>Insight:</strong> Troca de bateria e desbloqueio/IMEI têm a maior margem por hora. Priorize-os quando a agenda estiver cheia para maximizar faturamento diário.
+          <strong>Insight:</strong> <span id="lucro-insight">Abra esta tela após registrar ordens de serviço para ver o ranking real de faturamento.</span>
         </p>
       </div>
 
@@ -855,7 +854,7 @@
       </svg>
       NFS-e
     </button>
-    <button class="nav-item" data-screen="screen-lucro" onclick="navigate('screen-lucro')">
+    <button class="nav-item" data-screen="screen-lucro" onclick="navigate('screen-lucro'); renderLucratividade()">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
         <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
       </svg>

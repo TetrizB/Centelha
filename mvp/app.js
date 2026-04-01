@@ -958,51 +958,65 @@ function fileToDataUrl(file) {
 function stampTimestamp(dataUrl, gps) {
   return new Promise((res) => {
     const img = new Image();
+
+    // Garante que a Promise sempre resolve mesmo se o canvas falhar
+    img.onerror = () => res(dataUrl);
+
     img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const MAX = 1280;
-      let w = img.width, h = img.height;
-      if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
-      canvas.width  = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, w, h);
+      try {
+        const canvas = document.createElement('canvas');
+        const MAX = 1280;
+        let w = img.width, h = img.height;
+        if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+        canvas.width  = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
 
-      // Timestamp + GPS
-      const now      = new Date();
-      const dateStr  = now.toLocaleDateString('pt-BR');
-      const timeStr  = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      const locStr   = (gps && gps.locStr) ? gps.locStr : 'GPS indisponível';
-      const coordStr = (gps && gps.lat !== null) ? `${gps.lat.toFixed(5)}, ${gps.lon.toFixed(5)}` : null;
+        // Timestamp + GPS
+        const now      = new Date();
+        const dateStr  = now.toLocaleDateString('pt-BR');
+        const timeStr  = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const locStr   = (gps && gps.locStr) ? gps.locStr : 'GPS indisponivel';
+        const coordStr = (gps && gps.lat !== null) ? `${gps.lat.toFixed(5)}, ${gps.lon.toFixed(5)}` : null;
 
-      const fontSize = Math.max(12, Math.round(w / 40));
-      ctx.font       = `bold ${fontSize}px Inter, sans-serif`;
-      const lines    = [
-        `📅 ${dateStr} ${timeStr}`,
-        `📍 ${locStr}`,
-        ...(coordStr ? [`   ${coordStr}`] : []),
-      ];
-      const padding  = 10;
-      const lineH    = fontSize + 6;
-      const boxH     = lines.length * lineH + padding * 2;
-      const boxW     = lines.reduce((mx, l) => Math.max(mx, ctx.measureText(l).width), 0) + padding * 2;
+        const fontSize = Math.max(12, Math.round(w / 40));
+        ctx.font       = `bold ${fontSize}px Arial, sans-serif`;
+        const lines    = [
+          `Data: ${dateStr} ${timeStr}`,
+          `Local: ${locStr}`,
+          ...(coordStr ? [`GPS: ${coordStr}`] : []),
+        ];
+        const padding  = 10;
+        const lineH    = fontSize + 6;
+        const boxH     = lines.length * lineH + padding * 2;
+        const boxW     = lines.reduce((mx, l) => Math.max(mx, ctx.measureText(l).width), 0) + padding * 2;
 
-      // Caixa semitransparente na parte inferior
-      const bx = padding;
-      const by = h - boxH - padding;
-      ctx.fillStyle = 'rgba(0,0,0,0.62)';
-      ctx.beginPath();
-      ctx.roundRect(bx, by, boxW, boxH, 6);
-      ctx.fill();
+        // Caixa semitransparente — usa fillRect como fallback seguro para todos os browsers
+        const bx = padding;
+        const by = h - boxH - padding;
+        ctx.fillStyle = 'rgba(0,0,0,0.65)';
+        ctx.beginPath();
+        if (typeof ctx.roundRect === 'function') {
+          ctx.roundRect(bx, by, boxW, boxH, 6);
+        } else {
+          ctx.rect(bx, by, boxW, boxH);
+        }
+        ctx.fill();
 
-      // Texto branco
-      ctx.fillStyle = '#ffffff';
-      lines.forEach((line, i) => {
-        ctx.fillText(line, bx + padding, by + padding + fontSize + i * lineH);
-      });
+        // Texto branco
+        ctx.fillStyle = '#ffffff';
+        lines.forEach((line, i) => {
+          ctx.fillText(line, bx + padding, by + padding + fontSize + i * lineH);
+        });
 
-      res(canvas.toDataURL('image/jpeg', 0.88));
+        res(canvas.toDataURL('image/jpeg', 0.88));
+      } catch (e) {
+        console.error('[stamp] Falha ao carimbar foto, usando original:', e);
+        res(dataUrl); // retorna a foto sem carimbo em vez de bloquear
+      }
     };
+
     img.src = dataUrl;
   });
 }
@@ -1285,39 +1299,83 @@ function confirmarNumeroNFSe() {
 
 // ── Lucratividade ──────────────────────────────────────────────
 function renderLucratividade() {
-  // Calcula margem/hora e ordena
-  const data = LUCRO_DATA.map(d => ({
-    ...d,
-    margemHora: Math.round(d.preco * (d.margem / 100) / d.tempo),
-  })).sort((a, b) => b.margemHora - a.margemHora);
+  const todasOS = state.getAll();
+  const medals  = ['🥇','🥈','🥉'];
 
-  const maxMargem = data[0].margemHora;
-  const medals = ['🥇','🥈','🥉'];
+  if (todasOS.length === 0) {
+    document.getElementById('bar-chart').innerHTML =
+      '<p style="text-align:center;padding:32px 16px;color:var(--muted)">Crie ordens de serviço para ver o ranking de faturamento.</p>';
+    document.getElementById('lucro-tbody').innerHTML =
+      '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">Sem dados ainda.</td></tr>';
+    const ins = document.getElementById('lucro-insight');
+    if (ins) ins.textContent = 'Registre ordens de serviço para ver insights de faturamento real.';
+    return;
+  }
+
+  // Agrega faturamento por descrição de serviço (tabela de itens) ou por tipo de aparelho
+  const map = {};
+  for (const os of todasOS) {
+    if (os.itens && os.itens.length > 0) {
+      for (const item of os.itens) {
+        if (!item.desc || (item.total || 0) <= 0) continue;
+        const key = item.desc.trim();
+        if (!map[key]) map[key] = { servico: key, faturado: 0, count: 0 };
+        map[key].faturado += item.total;
+        map[key].count++;
+      }
+    } else if ((os.valor || 0) > 0) {
+      const key = os.tipo || 'Outros';
+      if (!map[key]) map[key] = { servico: key, faturado: 0, count: 0 };
+      map[key].faturado += os.valor;
+      map[key].count++;
+    }
+  }
+
+  const data = Object.values(map)
+    .filter(d => d.faturado > 0)
+    .sort((a, b) => b.faturado - a.faturado);
+
+  if (data.length === 0) {
+    document.getElementById('bar-chart').innerHTML =
+      '<p style="text-align:center;padding:32px 16px;color:var(--muted)">Nenhum serviço com valor registrado ainda.</p>';
+    document.getElementById('lucro-tbody').innerHTML =
+      '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">Sem serviços com valor.</td></tr>';
+    return;
+  }
+
+  const maxFaturado = data[0].faturado;
+  const totalGeral  = data.reduce((s, d) => s + d.faturado, 0);
 
   // Tabela
   const tbodyRows = data.map((d, i) => `
     <tr class="${i === 0 ? 'top-1' : ''}">
-      <td><span class="rank-medal">${medals[i] || i+1}</span></td>
-      <td style="font-weight:600">${d.servico}</td>
-      <td>${formatCurrency(d.preco)}</td>
-      <td>${d.tempo}h</td>
-      <td style="color:var(--success);font-weight:700">${formatCurrency(d.margemHora)}/h</td>
-      <td><span class="badge ${i < 3 ? 'badge-done' : i < 6 ? 'badge-progress' : 'badge-waiting'}">${d.margem}%</span></td>
+      <td><span class="rank-medal">${medals[i] || i + 1}</span></td>
+      <td style="font-weight:600">${escHtml(d.servico)}</td>
+      <td style="text-align:center">${d.count}</td>
+      <td style="color:var(--success);font-weight:700">${formatCurrency(d.faturado)}</td>
+      <td><span class="badge ${i < 3 ? 'badge-done' : i < 6 ? 'badge-progress' : 'badge-waiting'}">${Math.round((d.faturado / totalGeral) * 100)}%</span></td>
     </tr>`).join('');
   document.getElementById('lucro-tbody').innerHTML = tbodyRows;
 
-  // Gráfico de barras CSS
+  // Gráfico de barras
   const barRows = data.slice(0, 7).map(d => {
-    const pct = Math.round((d.margemHora / maxMargem) * 100);
+    const pct = Math.round((d.faturado / maxFaturado) * 100);
     return `
       <div class="bar-row">
-        <div class="bar-label" title="${d.servico}">${d.servico}</div>
+        <div class="bar-label" title="${escHtml(d.servico)}">${escHtml(d.servico)}</div>
         <div class="bar-track">
-          <div class="bar-fill" style="width:${pct}%"><span>${formatCurrency(d.margemHora)}</span></div>
+          <div class="bar-fill" style="width:${pct}%"><span>${formatCurrency(d.faturado)}</span></div>
         </div>
       </div>`;
   }).join('');
   document.getElementById('bar-chart').innerHTML = barRows;
+
+  // Insight dinâmico
+  const ins = document.getElementById('lucro-insight');
+  if (ins) {
+    const top = data[0];
+    ins.textContent = `${top.servico} lidera com ${formatCurrency(top.faturado)} (${Math.round((top.faturado / totalGeral) * 100)}% do total de ${formatCurrency(totalGeral)}). Priorize este serviço para maximizar o faturamento.`;
+  }
 }
 
 // ── Inicialização ──────────────────────────────────────────────
