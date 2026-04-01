@@ -150,6 +150,9 @@ let configAmbiente  = 'homologacao';
 
 // ── Auth & Init ─────────────────────────────────────────────────
 
+// Rate limiting de tentativas de login (proteção anti-brute-force)
+const _login = { attempts: 0, blockedUntil: 0 };
+
 function showLoginScreen() {
   document.getElementById('login-screen').classList.remove('hidden');
   document.getElementById('app').classList.add('hidden');
@@ -161,6 +164,15 @@ function showApp() {
 }
 
 async function handleLogin() {
+  const now = Date.now();
+  if (_login.blockedUntil > now) {
+    const secs = Math.ceil((_login.blockedUntil - now) / 1000);
+    const errEl = document.getElementById('login-error');
+    errEl.textContent = `Muitas tentativas. Aguarde ${secs}s antes de tentar novamente.`;
+    errEl.classList.remove('hidden');
+    return;
+  }
+
   const email    = document.getElementById('login-email').value.trim();
   const password = document.getElementById('login-password').value;
   const btn      = document.getElementById('login-btn');
@@ -176,11 +188,20 @@ async function handleLogin() {
   btn.textContent = 'Entrar';
 
   if (error) {
-    errEl.textContent = 'Email ou senha incorretos.';
+    _login.attempts++;
+    if (_login.attempts >= 5) {
+      _login.blockedUntil = Date.now() + 30000; // bloqueia 30s
+      _login.attempts     = 0;
+      errEl.textContent = 'Conta bloqueada temporariamente por 30 segundos. Tente novamente em seguida.';
+    } else {
+      errEl.textContent = `Email ou senha incorretos. (${5 - _login.attempts} tentativa(s) restante(s))`;
+    }
     errEl.classList.remove('hidden');
     return;
   }
 
+  _login.attempts     = 0;
+  _login.blockedUntil = 0;
   showApp();
   await postLoginSetup();
 }
@@ -232,6 +253,15 @@ let itemRowCount = 0;
 let _gpsCache = null; // { lat, lon, cidade } — reutilizado entre fotos da mesma OS
 
 // ── Utils ──────────────────────────────────────────────────────
+
+/**
+ * Escapa caracteres HTML especiais para prevenir XSS.
+ * Use sempre que inserir dados do usuário via innerHTML.
+ */
+function escHtml(str) {
+  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
 function formatCurrency(v) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
 }
@@ -450,6 +480,19 @@ function handleCEPInput(el) {
 function handleLogoUpload(input) {
   const file = input.files[0];
   if (!file) return;
+
+  const ALLOWED = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+  if (!ALLOWED.includes(file.type)) {
+    showToast('Formato inválido. Use JPG, PNG, WebP ou GIF.', 'error');
+    input.value = '';
+    return;
+  }
+  if (file.size > 2 * 1024 * 1024) { // 2 MB
+    showToast('Imagem muito grande. Máximo 2 MB.', 'error');
+    input.value = '';
+    return;
+  }
+
   const reader = new FileReader();
   reader.onload = e => {
     const img = new Image();
@@ -491,16 +534,16 @@ function renderDashboard() {
     return;
   }
   container.innerHTML = list.map(os => `
-    <div class="os-item" onclick="openOS('${os.id}')">
+    <div class="os-item" onclick="openOS('${escHtml(os.id)}')">
       <div class="os-icon">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1a365d" stroke-width="1.8">
           <rect x="5" y="2" width="14" height="20" rx="2"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="11" x2="15" y2="11"/><line x1="9" y1="15" x2="12" y2="15"/>
         </svg>
       </div>
       <div class="os-info">
-        <div class="os-number">${os.id}</div>
-        <div class="os-client">${os.cliente}</div>
-        <div class="os-device">${os.tipo} — ${os.marca}</div>
+        <div class="os-number">${escHtml(os.id)}</div>
+        <div class="os-client">${escHtml(os.cliente)}</div>
+        <div class="os-device">${escHtml(os.tipo)} — ${escHtml(os.marca)}</div>
       </div>
       <div class="os-meta">
         <div class="os-value">${formatCurrency(os.valor)}</div>
@@ -788,21 +831,21 @@ function buildSummary() {
     : condicoesOutros || '—';
 
   const itensHTML = itens.length
-    ? itens.map(i => `<div class="summary-row"><span class="summary-key" style="font-size:.75rem">${i.qtde}× ${i.desc}</span><span class="summary-val" style="font-size:.78rem">${formatCurrency(i.total)}</span></div>`).join('')
+    ? itens.map(i => `<div class="summary-row"><span class="summary-key" style="font-size:.75rem">${escHtml(String(i.qtde))}× ${escHtml(i.desc)}</span><span class="summary-val" style="font-size:.78rem">${formatCurrency(i.total)}</span></div>`).join('')
     : '<div class="summary-row"><span class="summary-key">Itens</span><span class="summary-val" style="font-style:italic;opacity:.7">Não informado</span></div>';
 
   document.getElementById('summary-content').innerHTML = `
     <div class="summary-card">
-      <div class="summary-row"><span class="summary-key">Cliente</span><span class="summary-val">${cliente}</span></div>
-      <div class="summary-row"><span class="summary-key">Telefone</span><span class="summary-val">${telefone}</span></div>
-      ${cpf ? `<div class="summary-row"><span class="summary-key">CPF</span><span class="summary-val">${cpf}</span></div>` : ''}
-      ${cidade ? `<div class="summary-row"><span class="summary-key">Cidade</span><span class="summary-val">${cidade}</span></div>` : ''}
-      <div class="summary-row"><span class="summary-key">Aparelho</span><span class="summary-val">${tipo} — ${marca}</span></div>
-      ${imei1 ? `<div class="summary-row"><span class="summary-key">IMEI 1</span><span class="summary-val" style="font-size:.78rem">${imei1}</span></div>` : ''}
+      <div class="summary-row"><span class="summary-key">Cliente</span><span class="summary-val">${escHtml(cliente)}</span></div>
+      <div class="summary-row"><span class="summary-key">Telefone</span><span class="summary-val">${escHtml(telefone)}</span></div>
+      ${cpf ? `<div class="summary-row"><span class="summary-key">CPF</span><span class="summary-val">${escHtml(cpf)}</span></div>` : ''}
+      ${cidade ? `<div class="summary-row"><span class="summary-key">Cidade</span><span class="summary-val">${escHtml(cidade)}</span></div>` : ''}
+      <div class="summary-row"><span class="summary-key">Aparelho</span><span class="summary-val">${escHtml(tipo)} — ${escHtml(marca)}</span></div>
+      ${imei1 ? `<div class="summary-row"><span class="summary-key">IMEI 1</span><span class="summary-val" style="font-size:.78rem">${escHtml(imei1)}</span></div>` : ''}
       <div class="summary-row"><span class="summary-key">NF / Garantia</span><span class="summary-val">${nfAparelho === 'sim' ? '✅ Tem NF' : 'Sem NF'} · ${garantia === 'sim' ? '✅ Em garantia' : 'Sem garantia'}</span></div>
-      <div class="summary-row"><span class="summary-key">Defeito</span><span class="summary-val" style="max-width:65%;font-size:.8rem">${defeito}</span></div>
-      <div class="summary-row"><span class="summary-key">Condições</span><span class="summary-val" style="max-width:65%;font-size:.78rem">${condicoesStr}</span></div>
-      ${patternSequence.length ? `<div class="summary-row"><span class="summary-key">Padrão</span><span class="summary-val" style="letter-spacing:2px">${patternSequence.join('→')}</span></div>` : ''}
+      <div class="summary-row"><span class="summary-key">Defeito</span><span class="summary-val" style="max-width:65%;font-size:.8rem">${escHtml(defeito)}</span></div>
+      <div class="summary-row"><span class="summary-key">Condições</span><span class="summary-val" style="max-width:65%;font-size:.78rem">${escHtml(condicoesStr)}</span></div>
+      ${patternSequence.length ? `<div class="summary-row"><span class="summary-key">Padrão</span><span class="summary-val" style="letter-spacing:2px">${patternSequence.map(Number).join('→')}</span></div>` : ''}
       <div class="summary-row"><span class="summary-key">Fotos</span><span class="summary-val">${wizardData.fotos.length} foto(s)</span></div>
       ${itensHTML}
       ${previsao ? `<div class="summary-row"><span class="summary-key">Previsão Saída</span><span class="summary-val">${new Date(previsao + 'T12:00:00').toLocaleDateString('pt-BR')}</span></div>` : ''}
@@ -1043,19 +1086,19 @@ function renderOSView(id) {
 
         <div class="os-doc-section">
           <h4>👤 Dados do Cliente</h4>
-          <div class="os-field-row"><span class="os-field-label">Nome</span><span class="os-field-value">${os.cliente}</span></div>
-          <div class="os-field-row"><span class="os-field-label">Telefone</span><span class="os-field-value">${os.telefone}</span></div>
-          ${os.cpf ? `<div class="os-field-row"><span class="os-field-label">CPF</span><span class="os-field-value">${os.cpf}</span></div>` : ''}
-          ${os.email ? `<div class="os-field-row"><span class="os-field-label">E-mail</span><span class="os-field-value">${os.email}</span></div>` : ''}
-          ${os.endereco ? `<div class="os-field-row"><span class="os-field-label">Endereço</span><span class="os-field-value" style="font-size:.8rem">${os.endereco}${os.cidade ? ' — ' + os.cidade : ''}</span></div>` : ''}
+          <div class="os-field-row"><span class="os-field-label">Nome</span><span class="os-field-value">${escHtml(os.cliente)}</span></div>
+          <div class="os-field-row"><span class="os-field-label">Telefone</span><span class="os-field-value">${escHtml(os.telefone)}</span></div>
+          ${os.cpf ? `<div class="os-field-row"><span class="os-field-label">CPF</span><span class="os-field-value">${escHtml(os.cpf)}</span></div>` : ''}
+          ${os.email ? `<div class="os-field-row"><span class="os-field-label">E-mail</span><span class="os-field-value">${escHtml(os.email)}</span></div>` : ''}
+          ${os.endereco ? `<div class="os-field-row"><span class="os-field-label">Endereço</span><span class="os-field-value" style="font-size:.8rem">${escHtml(os.endereco)}${os.cidade ? ' — ' + escHtml(os.cidade) : ''}</span></div>` : ''}
         </div>
 
         <div class="os-doc-section">
           <h4>📱 Aparelho</h4>
-          <div class="os-field-row"><span class="os-field-label">Tipo</span><span class="os-field-value">${os.tipo || '—'}</span></div>
-          <div class="os-field-row"><span class="os-field-label">Marca/Modelo</span><span class="os-field-value">${os.marca}</span></div>
-          ${os.imei1 ? `<div class="os-field-row"><span class="os-field-label">IMEI 1</span><span class="os-field-value" style="font-size:.78rem;letter-spacing:.5px">${os.imei1}</span></div>` : ''}
-          ${os.imei2 ? `<div class="os-field-row"><span class="os-field-label">IMEI 2</span><span class="os-field-value" style="font-size:.78rem;letter-spacing:.5px">${os.imei2}</span></div>` : ''}
+          <div class="os-field-row"><span class="os-field-label">Tipo</span><span class="os-field-value">${escHtml(os.tipo || '—')}</span></div>
+          <div class="os-field-row"><span class="os-field-label">Marca/Modelo</span><span class="os-field-value">${escHtml(os.marca)}</span></div>
+          ${os.imei1 ? `<div class="os-field-row"><span class="os-field-label">IMEI 1</span><span class="os-field-value" style="font-size:.78rem;letter-spacing:.5px">${escHtml(os.imei1)}</span></div>` : ''}
+          ${os.imei2 ? `<div class="os-field-row"><span class="os-field-label">IMEI 2</span><span class="os-field-value" style="font-size:.78rem;letter-spacing:.5px">${escHtml(os.imei2)}</span></div>` : ''}
           <div class="os-field-row">
             <span class="os-field-label">Nota Fiscal</span>
             <span class="os-field-value">${os.nfAparelho === 'sim' ? '✅ Possui' : '❌ Não possui'}</span>
@@ -1064,9 +1107,9 @@ function renderOSView(id) {
             <span class="os-field-label">Garantia</span>
             <span class="os-field-value">${os.garantia === 'sim' ? '✅ Em garantia' : '❌ Fora da garantia'}</span>
           </div>
-          <div class="os-field-row"><span class="os-field-label">Defeito</span><span class="os-field-value" style="font-size:.78rem">${os.defeito}</span></div>
-          ${(os.condicoes && os.condicoes.length) ? `<div class="os-field-row"><span class="os-field-label">Condições</span><span class="os-field-value" style="font-size:.78rem">${os.condicoes.join(', ')}${os.condicoesOutros ? ', ' + os.condicoesOutros : ''}</span></div>` : ''}
-          ${(os.senhaParao && os.senhaParao.length) ? `<div class="os-field-row"><span class="os-field-label">Padrão</span><span class="os-field-value" style="letter-spacing:2px;font-weight:700">${os.senhaParao.join('→')}</span></div>` : ''}
+          <div class="os-field-row"><span class="os-field-label">Defeito</span><span class="os-field-value" style="font-size:.78rem">${escHtml(os.defeito)}</span></div>
+          ${(os.condicoes && os.condicoes.length) ? `<div class="os-field-row"><span class="os-field-label">Condições</span><span class="os-field-value" style="font-size:.78rem">${escHtml(os.condicoes.join(', '))}${os.condicoesOutros ? ', ' + escHtml(os.condicoesOutros) : ''}</span></div>` : ''}
+          ${(os.senhaParao && os.senhaParao.length) ? `<div class="os-field-row"><span class="os-field-label">Padrão</span><span class="os-field-value" style="letter-spacing:2px;font-weight:700">${os.senhaParao.map(Number).join('→')}</span></div>` : ''}
           ${os.previsao ? `<div class="os-field-row"><span class="os-field-label">Previsão Saída</span><span class="os-field-value">${new Date(os.previsao + 'T12:00:00').toLocaleDateString('pt-BR')}</span></div>` : ''}
         </div>
 
@@ -1080,7 +1123,7 @@ function renderOSView(id) {
               <th style="padding:4px 6px;text-align:right">Unit.</th>
               <th style="padding:4px 6px;text-align:right">Total</th>
             </tr></thead>
-            <tbody>${os.itens.map(i => `<tr style="border-bottom:1px solid #e2e8f0"><td style="padding:4px 6px">${i.qtde}</td><td style="padding:4px 6px">${i.desc}</td><td style="padding:4px 6px;text-align:right">${formatCurrency(i.unit)}</td><td style="padding:4px 6px;text-align:right;font-weight:700">${formatCurrency(i.total)}</td></tr>`).join('')}</tbody>
+            <tbody>${os.itens.map(i => `<tr style="border-bottom:1px solid #e2e8f0"><td style="padding:4px 6px">${escHtml(String(i.qtde))}</td><td style="padding:4px 6px">${escHtml(i.desc)}</td><td style="padding:4px 6px;text-align:right">${formatCurrency(i.unit)}</td><td style="padding:4px 6px;text-align:right;font-weight:700">${formatCurrency(i.total)}</td></tr>`).join('')}</tbody>
           </table>
         </div>` : ''}
 
@@ -1100,18 +1143,18 @@ function renderOSView(id) {
 
         <div class="os-doc-section">
           <h4>🏢 Prestador</h4>
-          ${currentProfile?.logo_base64 ? `<img src="${currentProfile.logo_base64}" alt="Logo" style="max-height:48px;margin-bottom:8px;border-radius:4px">` : ''}
-          <div class="os-field-row"><span class="os-field-label">Empresa</span><span class="os-field-value" style="font-size:.78rem">${currentProfile?.razao_social || '—'}</span></div>
-          ${currentProfile?.nome_fantasia && currentProfile.nome_fantasia !== currentProfile.razao_social ? `<div class="os-field-row"><span class="os-field-label">Nome Fantasia</span><span class="os-field-value" style="font-size:.78rem">${currentProfile.nome_fantasia}</span></div>` : ''}
-          <div class="os-field-row"><span class="os-field-label">CNPJ/CPF</span><span class="os-field-value">${currentProfile?.cnpj_cpf || '—'}</span></div>
-          ${currentProfile?.logradouro ? `<div class="os-field-row"><span class="os-field-label">Endereço</span><span class="os-field-value" style="font-size:.75rem">${currentProfile.logradouro}${currentProfile.numero ? ', ' + currentProfile.numero : ''}${currentProfile.bairro ? ' — ' + currentProfile.bairro : ''}${currentProfile.cidade ? ', ' + currentProfile.cidade + '/' + currentProfile.estado : ''}</span></div>` : ''}
-          ${currentProfile?.telefone ? `<div class="os-field-row"><span class="os-field-label">Telefone</span><span class="os-field-value">${currentProfile.telefone}</span></div>` : ''}
+          ${currentProfile?.logo_base64 ? `<img src="${escHtml(currentProfile.logo_base64)}" alt="Logo" style="max-height:48px;margin-bottom:8px;border-radius:4px">` : ''}
+          <div class="os-field-row"><span class="os-field-label">Empresa</span><span class="os-field-value" style="font-size:.78rem">${escHtml(currentProfile?.razao_social || '—')}</span></div>
+          ${currentProfile?.nome_fantasia && currentProfile.nome_fantasia !== currentProfile.razao_social ? `<div class="os-field-row"><span class="os-field-label">Nome Fantasia</span><span class="os-field-value" style="font-size:.78rem">${escHtml(currentProfile.nome_fantasia)}</span></div>` : ''}
+          <div class="os-field-row"><span class="os-field-label">CNPJ/CPF</span><span class="os-field-value">${escHtml(currentProfile?.cnpj_cpf || '—')}</span></div>
+          ${currentProfile?.logradouro ? `<div class="os-field-row"><span class="os-field-label">Endereço</span><span class="os-field-value" style="font-size:.75rem">${escHtml(currentProfile.logradouro)}${currentProfile.numero ? ', ' + escHtml(currentProfile.numero) : ''}${currentProfile.bairro ? ' — ' + escHtml(currentProfile.bairro) : ''}${currentProfile.cidade ? ', ' + escHtml(currentProfile.cidade) + '/' + escHtml(currentProfile.estado) : ''}</span></div>` : ''}
+          ${currentProfile?.telefone ? `<div class="os-field-row"><span class="os-field-label">Telefone</span><span class="os-field-value">${escHtml(currentProfile.telefone)}</span></div>` : ''}
         </div>
 
         <div class="os-doc-section" style="background:#fafbfc;border-radius:8px;padding:10px 12px;border:1px solid #e2e8f0">
           <h4 style="font-size:.78rem;margin-bottom:6px;opacity:.8">⚖️ Termos e Condições</h4>
           ${currentProfile?.termos_garantia
-            ? `<p style="font-size:.7rem;color:var(--muted);white-space:pre-line">${currentProfile.termos_garantia}</p>`
+            ? `<p style="font-size:.7rem;color:var(--muted);white-space:pre-line">${escHtml(currentProfile.termos_garantia)}</p>`
             : `<ol style="padding-left:14px;display:flex;flex-direction:column;gap:3px">
                 <li style="font-size:.7rem;color:var(--muted)">Garantia de 90 dias para os serviços realizados.</li>
                 <li style="font-size:.7rem;color:var(--muted)">Garantia de peças válida somente contra defeitos de fabricação.</li>
@@ -1119,8 +1162,8 @@ function renderOSView(id) {
                 <li style="font-size:.7rem;color:var(--muted)">Aparelho testado antecipadamente na entrada e saída.</li>
                 <li style="font-size:.7rem;color:var(--muted)">Mercadorias não retiradas em 60 dias poderão ser vendidas para cobrir custos.</li>
                </ol>`}
-          ${currentProfile?.observacoes_padrao ? `<p style="font-size:.7rem;color:var(--muted);margin-top:6px;white-space:pre-line">${currentProfile.observacoes_padrao}</p>` : ''}
-          ${currentProfile?.rodape ? `<p style="font-size:.72rem;color:var(--muted);margin-top:8px;text-align:center;font-style:italic">${currentProfile.rodape}</p>` : ''}
+          ${currentProfile?.observacoes_padrao ? `<p style="font-size:.7rem;color:var(--muted);margin-top:6px;white-space:pre-line">${escHtml(currentProfile.observacoes_padrao)}</p>` : ''}
+          ${currentProfile?.rodape ? `<p style="font-size:.72rem;color:var(--muted);margin-top:8px;text-align:center;font-style:italic">${escHtml(currentProfile.rodape)}</p>` : ''}
         </div>
 
       </div>
@@ -1180,39 +1223,65 @@ function openNFSe(id) {
   document.getElementById('nfse-success').classList.remove('show');
   document.getElementById('nfse-form-inner').style.display = 'block';
 
+  // Garante estado limpo do painel de confirmação a cada abertura
+  document.getElementById('nfse-portal-instructions').classList.add('hidden');
+  document.getElementById('btn-emitir-nfse').classList.remove('hidden');
+  const numInput = document.getElementById('nfse-numero-manual');
+  if (numInput) numInput.value = '';
+
   navigate('screen-nfse');
 }
 
-async function emitirNFSe() {
+function emitirNFSe() {
   if (!checkProfileComplete()) return;
-  const btn = document.getElementById('btn-emitir-nfse');
-  btn.innerHTML = '<span class="spinner"></span> Enviando para ABRASF...';
-  btn.disabled = true;
 
-  // Simula delay de API (1.8s)
-  await sleep(1000);
-  btn.innerHTML = '<span class="spinner"></span> Autenticando certificado...';
-  await sleep(800);
+  const cnpj  = document.getElementById('nfse-prestador-cnpj').value.trim();
+  const valor = parseFloat(document.getElementById('nfse-valor').value) || 0;
 
-  const nfseNum = `NFS-e Nº ${String(Math.floor(100000 + Math.random() * 900000)).substring(0,6)}`;
+  if (!cnpj) {
+    showToast('CNPJ/CPF do prestador é obrigatório. Configure em Configurações → Fiscal.', 'error');
+    return;
+  }
+  if (valor <= 0) {
+    showToast('Informe o valor total do serviço antes de emitir.', 'error');
+    return;
+  }
+
+  // Abre o portal federal em nova aba de forma segura
+  window.open('https://www.nfse.gov.br', '_blank', 'noopener,noreferrer');
+
+  // Exibe o painel de confirmação manual e oculta o botão principal
+  document.getElementById('nfse-portal-instructions').classList.remove('hidden');
+  document.getElementById('btn-emitir-nfse').classList.add('hidden');
+}
+
+function confirmarNumeroNFSe() {
+  const numero = document.getElementById('nfse-numero-manual').value.trim();
+  if (!numero || !/^\d{1,10}$/.test(numero)) {
+    showToast('Informe o número da NFS-e (somente dígitos, máx. 10).', 'error');
+    return;
+  }
+
+  const nfseNum = `NFS-e Nº ${numero}`;
   const os = state.getById(currentOSId);
   if (os) {
     state.update(currentOSId, { nfse: nfseNum, status: 'concluida' });
   }
 
-  // Exibe sucesso
+  // Exibe tela de sucesso
   document.getElementById('nfse-form-inner').style.display = 'none';
   document.getElementById('nfse-emitted-number').textContent = nfseNum;
   document.getElementById('nfse-emitted-os').textContent     = currentOSId || '';
   document.getElementById('nfse-success').classList.add('show');
-  btn.disabled = false;
-  btn.innerHTML = 'Emitir NFS-e';
+
+  // Reseta o painel para a próxima emissão
+  document.getElementById('nfse-portal-instructions').classList.add('hidden');
+  document.getElementById('btn-emitir-nfse').classList.remove('hidden');
+  document.getElementById('nfse-numero-manual').value = '';
 
   showToast(`${nfseNum} vinculada à ${currentOSId}`, 'success');
   renderDashboard();
 }
-
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // ── Lucratividade ──────────────────────────────────────────────
 function renderLucratividade() {
