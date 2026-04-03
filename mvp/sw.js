@@ -1,9 +1,11 @@
 /* ============================================================
    OficinaPRO — Service Worker
-   Estratégia: Cache-First para shell do app, Network-First para dados
+   Estratégia: Network-First para app shell (updates imediatos),
+               Network-First para dados Supabase,
+               Cache apenas como fallback offline.
    ============================================================ */
 
-const CACHE_NAME = 'oficina-pro-v2';
+const CACHE_NAME = 'oficina-pro-v3';
 const APP_SHELL = [
   './',
   './index.html',
@@ -34,34 +36,20 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
-/* ── Fetch: Cache-First para assets, Network-First para API ── */
+/* ── Fetch: Network-First para tudo ── */
 self.addEventListener('fetch', event => {
-  const url = new URL(event.request.url);
-
-  // Ignora requisições que não são GET
   if (event.request.method !== 'GET') return;
 
-  // Network-First para Supabase (dados em tempo real)
-  if (url.hostname.includes('supabase.co')) {
-    event.respondWith(
-      fetch(event.request)
-        .catch(() => caches.match(event.request))
-    );
-    return;
-  }
-
-  // Cache-First para tudo mais (app shell)
+  // Network-First: tenta buscar da rede, usa cache só se offline
   event.respondWith(
-    caches.match(event.request).then(cached => {
-      if (cached) return cached;
-      return fetch(event.request).then(response => {
-        if (!response || response.status !== 200 || response.type === 'opaque') {
-          return response;
-        }
-        const toCache = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, toCache));
+    fetch(event.request).then(response => {
+      if (!response || response.status !== 200 || response.type === 'opaque') {
         return response;
-      });
-    })
+      }
+      // Atualiza o cache com a versão mais recente
+      const toCache = response.clone();
+      caches.open(CACHE_NAME).then(cache => cache.put(event.request, toCache));
+      return response;
+    }).catch(() => caches.match(event.request))
   );
 });

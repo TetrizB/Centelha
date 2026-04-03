@@ -44,47 +44,11 @@ const OFICINA = {
 // ── State Manager ──────────────────────────────────────────────
 class AppState {
   constructor() {
-    this._os = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-
-    // OS mockadas para demo (inseridas apenas se o storage estiver vazio)
-    if (this._os.length === 0) this._seedMockData();
-  }
-
-  _seedMockData() {
-    const mock = [
-      {
-        id: 'OS-2026-0001', numero: 1,
-        cliente: 'Carlos Eduardo Silva', telefone: '(11) 98765-4321',
-        tipo: 'Celular', marca: 'Samsung Galaxy S22',
-        defeito: 'Tela quebrada — mancha de pressão no canto inferior',
-        valor: 280, status: 'concluida',
-        dataCriacao: new Date(Date.now() - 86400000 * 2).toISOString(),
-        fotos: [], nfse: 'NFS-e Nº 000121',
-        assinatura: { status: 'signed', hora: '10:42' },
-      },
-      {
-        id: 'OS-2026-0002', numero: 2,
-        cliente: 'Ana Paula Rodrigues', telefone: '(11) 91234-5678',
-        tipo: 'Notebook', marca: 'Dell Inspiron 15',
-        defeito: 'Não liga — provável falha na bateria ou conector de carga',
-        valor: 150, status: 'andamento',
-        dataCriacao: new Date(Date.now() - 3600000).toISOString(),
-        fotos: [], nfse: null,
-        assinatura: { status: 'signed', hora: '09:15' },
-      },
-      {
-        id: 'OS-2026-0003', numero: 3,
-        cliente: 'Roberto Fernandes', telefone: '(21) 99887-6655',
-        tipo: 'Tablet', marca: 'iPad 9ª geração',
-        defeito: 'Botão home não responde, tela com riscos',
-        valor: 200, status: 'aguardando',
-        dataCriacao: new Date(Date.now() - 900000).toISOString(),
-        fotos: [], nfse: null,
-        assinatura: { status: 'pending', hora: null },
-      },
-    ];
-    mock.forEach(os => this._os.push(os));
-    this._save();
+    // Remove dados mock antigos caso existam no storage
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    const MOCK_IDS = ['OS-2026-0001', 'OS-2026-0002', 'OS-2026-0003'];
+    this._os = stored.filter(os => !MOCK_IDS.includes(os.id));
+    if (this._os.length !== stored.length) this._save();
   }
 
   _save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(this._os)); }
