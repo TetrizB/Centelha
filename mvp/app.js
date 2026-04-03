@@ -32,14 +32,7 @@ const LUCRO_DATA = [
   { servico: 'Desbloqueio/IMEI',      preco: 60,  tempo: 0.25,margem: 185 },
 ];
 
-// Oficina prestadora (dados fixos para demo)
-const OFICINA = {
-  razao:   'TechFix Assistência Técnica LTDA',
-  cnpj:    '12.345.678/0001-99',
-  im:      '1234567',
-  endereco:'Rua das Ferramentas, 123 — São Paulo/SP',
-  telefone:'(11) 99999-0000',
-};
+const DEMO_CNPJ = '12.345.678/0001-99';
 
 // ── State Manager ──────────────────────────────────────────────
 class AppState {
@@ -185,6 +178,11 @@ async function handleLogout() {
 
 async function postLoginSetup() {
   currentProfile = await dbLoadProfile();
+
+  // Se o perfil carregado tem o CNPJ demo, trata como sem perfil
+  if (currentProfile && currentProfile.cnpj_cpf === DEMO_CNPJ) {
+    currentProfile = null;
+  }
 
   if (!currentProfile || !currentProfile.perfil_completo) {
     document.body.classList.add('onboarding-mode');
@@ -1223,6 +1221,14 @@ function openNFSe(id) {
 
   // Prestador — dados do perfil da empresa
   const p = currentProfile || {};
+
+  // Bloqueia se ainda houver dados demo (CNPJ falso de demonstração)
+  if (!p.razao_social || p.cnpj_cpf === DEMO_CNPJ) {
+    showToast('Atualize os dados da sua empresa antes de emitir a NFS-e.', 'error');
+    renderSettings();
+    navigate('screen-configuracoes');
+    return;
+  }
   document.getElementById('nfse-prestador-razao').value = p.razao_social       || '';
   document.getElementById('nfse-prestador-cnpj').value  = p.cnpj_cpf           || '';
   document.getElementById('nfse-prestador-im').value    = p.inscricao_municipal || '';
