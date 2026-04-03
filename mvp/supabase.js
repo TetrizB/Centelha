@@ -93,6 +93,10 @@ async function dbSave(os, attempt = 1) {
     if (!session) return { error: 'Sem sessão ativa' };
   }
 
+  // Remove fotos (base64) do payload — podem ter vários MB e causam rejeição
+  // As fotos ficam preservadas no localStorage e são restauradas no mergeFromCloud
+  const { fotos: _fotos, ...dadosSemFotos } = os;
+
   const { error } = await db
     .from('ordens_servico')
     .upsert({
@@ -101,7 +105,7 @@ async function dbSave(os, attempt = 1) {
       status:       os.status,
       data_criacao: os.dataCriacao,
       user_id:      session.user.id,
-      dados:        os,
+      dados:        dadosSemFotos,
     }, { onConflict: 'id' });
 
   if (error) {

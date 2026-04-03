@@ -104,17 +104,29 @@ class AppState {
   }
 
   mergeFromCloud(remoteOS) {
+    // Mapa local para restaurar fotos (não enviadas ao Supabase por serem grandes)
+    const localMap = new Map(this._os.map(o => [o.id, o]));
     const remoteIds = new Set(remoteOS.map(o => o.id));
-    // Mantém OS locais que ainda não chegaram ao Supabase (pendentes ou recém-criadas)
+
+    const merged = remoteOS.map(remote => {
+      const local = localMap.get(remote.id);
+      // Restaura fotos do cache local, pois não são enviadas ao servidor
+      return (local?.fotos?.length && !remote.fotos?.length)
+        ? { ...remote, fotos: local.fotos }
+        : remote;
+    });
+
+    // Mantém OS locais que ainda não chegaram ao Supabase (pendentes)
     const localOnly = this._os.filter(o => !remoteIds.has(o.id));
-    this._os = [...remoteOS, ...localOnly];
+    this._os = [...merged, ...localOnly];
     this._save();
   }
 
   // Tenta reenviar ao Supabase todas as OS que falharam anteriormente
   async syncPending() {
-    if (!this._pending.size || typeof dbSave !== 'function') return 0;
+    if (!this._pending.size || typeof dbSave !== 'function') return { synced: 0, lastError: null };
     let synced = 0;
+    let lastError = null;
     for (const id of [...this._pending]) {
       const os = this._os.find(o => o.id === id);
       if (!os) { this._pending.delete(id); continue; }
@@ -122,10 +134,12 @@ class AppState {
       if (!error) {
         this._pending.delete(id);
         synced++;
+      } else {
+        lastError = error;
       }
     }
     this._savePending();
-    return synced;
+    return { synced, lastError };
   }
 
   get pendingCount() { return this._pending.size; }
@@ -236,9 +250,14 @@ async function postLoginSetup() {
   if (remoteOS !== null) state.mergeFromCloud(remoteOS);
 
   // Reenvia OS que falharam em uploads anteriores
-  const synced = await state.syncPending();
+  const { synced, lastError } = await state.syncPending();
   if (synced > 0) showToast(`${synced} OS sincronizada(s) com o servidor.`, 'success');
-  if (state.pendingCount > 0) showToast(`${state.pendingCount} OS aguardando sincronização — verifique sua conexão.`, 'error');
+  if (state.pendingCount > 0) {
+    const msg = lastError
+      ? `Falha ao sincronizar OS: ${lastError.message || lastError}`
+      : `${state.pendingCount} OS aguardando sincronização.`;
+    showToast(msg, 'error');
+  }
 
   renderDashboard();
 }
