@@ -253,9 +253,15 @@ async function postLoginSetup() {
   const { synced, lastError } = await state.syncPending();
   if (synced > 0) showToast(`${synced} OS sincronizada(s) com o servidor.`, 'success');
   if (state.pendingCount > 0) {
-    const msg = lastError
-      ? `Falha ao sincronizar OS: ${lastError.message || lastError}`
-      : `${state.pendingCount} OS aguardando sincronização.`;
+    const isRLS = lastError && (
+      String(lastError.message || lastError).includes('row-level security') ||
+      String(lastError.message || lastError).includes('violates')
+    );
+    const msg = isRLS
+      ? `Erro de permissão no servidor. Execute o SQL de correção no painel Supabase (SQL Editor > passo 6 do supabase.js).`
+      : lastError
+        ? `Falha ao sincronizar: ${lastError.message || lastError}`
+        : `${state.pendingCount} OS aguardando sincronização.`;
     showToast(msg, 'error');
   }
 

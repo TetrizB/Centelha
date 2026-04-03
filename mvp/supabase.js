@@ -11,14 +11,31 @@
    ALTER TABLE ordens_servico ADD COLUMN IF NOT EXISTS id TEXT;
    ALTER TABLE ordens_servico ADD CONSTRAINT IF NOT EXISTS ordens_servico_id_unique UNIQUE (id);
 
-   -- 3. Remove a policy aberta anterior
+   -- 3. Remove policies antigas
    DROP POLICY IF EXISTS "acesso publico" ON ordens_servico;
+   DROP POLICY IF EXISTS "empresa ve so suas OS" ON ordens_servico;
 
-   -- 4. Cria policy que isola dados por empresa
-   CREATE POLICY "empresa ve so suas OS" ON ordens_servico
-     FOR ALL
-     USING  (auth.uid() = user_id)
-     WITH CHECK (auth.uid() = user_id);
+   -- 4. Habilita RLS
+   ALTER TABLE ordens_servico ENABLE ROW LEVEL SECURITY;
+
+   -- 5. Policies separadas por operação (evita o bug do USING em INSERT/UPDATE)
+   CREATE POLICY "select proprios" ON ordens_servico
+     FOR SELECT USING (auth.uid() = user_id);
+
+   CREATE POLICY "insert proprios" ON ordens_servico
+     FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+   CREATE POLICY "update proprios" ON ordens_servico
+     FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+   CREATE POLICY "delete proprios" ON ordens_servico
+     FOR DELETE USING (auth.uid() = user_id);
+
+   -- 6. CORREÇÃO: conserta linhas com user_id NULL (causadas por bug anterior)
+   --    Execute isto uma única vez para recuperar OS órfãs:
+   UPDATE ordens_servico
+   SET user_id = (SELECT id FROM auth.users ORDER BY created_at LIMIT 1)
+   WHERE user_id IS NULL;
 
    ============================================================ */
 
