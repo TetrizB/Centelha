@@ -38,13 +38,10 @@ const DEMO_CNPJ = '12.345.678/0001-99';
 // ── State Manager ──────────────────────────────────────────────
 class AppState {
   constructor() {
-    // Remove dados mock antigos caso existam no storage
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
     const MOCK_IDS = ['OS-2026-0001', 'OS-2026-0002', 'OS-2026-0003'];
     this._os = stored.filter(os => !MOCK_IDS.includes(os.id));
     if (this._os.length !== stored.length) this._save();
-
-    // Fila de OS que falharam ao subir para o Supabase e precisam de retry
     this._pending = new Set(JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'));
   }
 
@@ -63,23 +60,20 @@ class AppState {
     const num = this.getNextNum();
     const os  = {
       ...data,
-      numero:       num,
-      id:           `OS-2026-${String(num).padStart(4,'0')}`,
-      dataCriacao:  new Date().toISOString(),
-      status:       'aguardando',
-      nfse:         null,
-      assinatura:   { status: 'pending', hora: null },
+      numero:      num,
+      id:          `OS-2026-${String(num).padStart(4,'0')}`,
+      dataCriacao: new Date().toISOString(),
+      status:      'aguardando',
+      nfse:        null,
+      assinatura:  { status: 'pending', hora: null },
     };
     this._os.push(os);
     this._save();
-    if (typeof dbSave === 'function') {
-      const { error } = await dbSave(os);
-      if (error) {
-        // Enfileira para retry no próximo login/sync
-        this._pending.add(os.id);
-        this._savePending();
-        return { os, dbError: true };
-      }
+    const { error } = await dbSave(os);
+    if (error) {
+      this._pending.add(os.id);
+      this._savePending();
+      return { os, dbError: true };
     }
     return { os };
   }
@@ -89,54 +83,44 @@ class AppState {
     if (idx === -1) return { dbError: false };
     this._os[idx] = { ...this._os[idx], ...patch };
     this._save();
-    if (typeof dbSave === 'function') {
-      const { error } = await dbSave(this._os[idx]);
-      if (error) {
-        this._pending.add(id);
-        this._savePending();
-        return { os: this._os[idx], dbError: true };
-      }
-      // Sucesso: remove da fila se estava pendente
-      this._pending.delete(id);
+    const { error } = await dbSave(this._os[idx]);
+    if (error) {
+      this._pending.add(id);
       this._savePending();
+      return { os: this._os[idx], dbError: true };
     }
+    this._pending.delete(id);
+    this._savePending();
     return { os: this._os[idx] };
   }
 
+  // Merge com dados da nuvem preservando fotos locais (não enviadas ao servidor)
   mergeFromCloud(remoteOS) {
-    // Mapa local para restaurar fotos (não enviadas ao Supabase por serem grandes)
-    const localMap = new Map(this._os.map(o => [o.id, o]));
+    const localMap  = new Map(this._os.map(o => [o.id, o]));
     const remoteIds = new Set(remoteOS.map(o => o.id));
 
     const merged = remoteOS.map(remote => {
       const local = localMap.get(remote.id);
-      // Restaura fotos do cache local, pois não são enviadas ao servidor
       return (local?.fotos?.length && !remote.fotos?.length)
         ? { ...remote, fotos: local.fotos }
         : remote;
     });
 
-    // Mantém OS locais que ainda não chegaram ao Supabase (pendentes)
     const localOnly = this._os.filter(o => !remoteIds.has(o.id));
     this._os = [...merged, ...localOnly];
     this._save();
   }
 
-  // Tenta reenviar ao Supabase todas as OS que falharam anteriormente
+  // Reenvia OS pendentes ao Supabase
   async syncPending() {
-    if (!this._pending.size || typeof dbSave !== 'function') return { synced: 0, lastError: null };
-    let synced = 0;
-    let lastError = null;
+    if (!this._pending.size) return { synced: 0, lastError: null };
+    let synced = 0, lastError = null;
     for (const id of [...this._pending]) {
       const os = this._os.find(o => o.id === id);
       if (!os) { this._pending.delete(id); continue; }
       const { error } = await dbSave(os);
-      if (!error) {
-        this._pending.delete(id);
-        synced++;
-      } else {
-        lastError = error;
-      }
+      if (!error) { this._pending.delete(id); synced++; }
+      else lastError = error;
     }
     this._savePending();
     return { synced, lastError };
@@ -144,11 +128,10 @@ class AppState {
 
   get pendingCount() { return this._pending.size; }
 
-  // Mini-dashboard metrics
   metrics() {
     const hoje = new Date().toDateString();
-    const osHoje = this._os.filter(o => new Date(o.dataCriacao).toDateString() === hoje);
-    const faturamento = osHoje.filter(o => o.status === 'concluida').reduce((acc, o) => acc + (o.valor || 0), 0);
+    const osHoje      = this._os.filter(o => new Date(o.dataCriacao).toDateString() === hoje);
+    const faturamento = osHoje.filter(o => o.status === 'concluida').reduce((a, o) => a + (o.valor || 0), 0);
     const nfsEmitidas = this._os.filter(o => o.nfse !== null).length;
     return { total: osHoje.length, faturamento, nfsEmitidas };
   }
@@ -249,20 +232,11 @@ async function postLoginSetup() {
   const remoteOS = await dbLoadAll();
   if (remoteOS !== null) state.mergeFromCloud(remoteOS);
 
-  // Reenvia OS que falharam em uploads anteriores
   const { synced, lastError } = await state.syncPending();
   if (synced > 0) showToast(`${synced} OS sincronizada(s) com o servidor.`, 'success');
   if (state.pendingCount > 0) {
-    const isRLS = lastError && (
-      String(lastError.message || lastError).includes('row-level security') ||
-      String(lastError.message || lastError).includes('violates')
-    );
-    const msg = isRLS
-      ? `Erro de permissão no servidor. Execute o SQL de correção no painel Supabase (SQL Editor > passo 6 do supabase.js).`
-      : lastError
-        ? `Falha ao sincronizar: ${lastError.message || lastError}`
-        : `${state.pendingCount} OS aguardando sincronização.`;
-    showToast(msg, 'error');
+    const msg = lastError?.message || `${state.pendingCount} OS não sincronizada(s).`;
+    showToast(`Falha ao sincronizar: ${msg}`, 'error');
   }
 
   renderDashboard();
