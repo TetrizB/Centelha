@@ -84,9 +84,16 @@ async function dbSaveProfile(profile) {
 
 // ── Dados ───────────────────────────────────────────────────────
 
-async function dbSave(os) {
+async function dbSave(os, attempt = 1) {
+  // Tenta renovar a sessão antes de salvar (evita falhas por token expirado)
   const { data: { session } } = await db.auth.getSession();
-  if (!session) return;
+  if (!session) {
+    // Tenta refresh silencioso antes de desistir
+    const { data: refreshed } = await db.auth.refreshSession();
+    if (!refreshed?.session) return { error: 'Sem sessão ativa' };
+  }
+
+  const uid = session?.user?.id || (await db.auth.getSession()).data.session?.user?.id;
 
   const { error } = await db
     .from('ordens_servico')
@@ -95,9 +102,17 @@ async function dbSave(os) {
       numero:       os.numero,
       status:       os.status,
       data_criacao: os.dataCriacao,
-      user_id:      session.user.id,
+      user_id:      uid,
       dados:        os,
     }, { onConflict: 'id' });
 
-  if (error) console.error('[Supabase] Erro ao salvar OS:', error.message);
+  if (error) {
+    console.error(`[Supabase] Erro ao salvar OS (tentativa ${attempt}):`, error.message);
+    // Retry automático uma vez para erros transitórios de rede
+    if (attempt < 2) {
+      await new Promise(r => setTimeout(r, 1500));
+      return dbSave(os, attempt + 1);
+    }
+  }
+  return { error: error || null };
 }

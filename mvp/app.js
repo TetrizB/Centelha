@@ -7,6 +7,7 @@
 
 // ── Constantes ────────────────────────────────────────────────
 const STORAGE_KEY  = 'oficina_pro_os';
+const PENDING_KEY  = 'oficina_pro_pending';
 
 const DEVICE_TYPES = ['Celular','Notebook','Tablet','Eletrodoméstico','TV','Câmera','Videogame','Outro'];
 
@@ -42,12 +43,16 @@ class AppState {
     const MOCK_IDS = ['OS-2026-0001', 'OS-2026-0002', 'OS-2026-0003'];
     this._os = stored.filter(os => !MOCK_IDS.includes(os.id));
     if (this._os.length !== stored.length) this._save();
+
+    // Fila de OS que falharam ao subir para o Supabase e precisam de retry
+    this._pending = new Set(JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'));
   }
 
-  _save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(this._os)); }
+  _save()        { localStorage.setItem(STORAGE_KEY, JSON.stringify(this._os)); }
+  _savePending() { localStorage.setItem(PENDING_KEY, JSON.stringify([...this._pending])); }
 
-  getAll()      { return [...this._os].reverse(); }
-  getById(id)   { return this._os.find(os => os.id === id); }
+  getAll()    { return [...this._os].reverse(); }
+  getById(id) { return this._os.find(os => os.id === id); }
 
   getNextNum() {
     const nums = this._os.map(o => o.numero || 0);
@@ -69,7 +74,12 @@ class AppState {
     this._save();
     if (typeof dbSave === 'function') {
       const { error } = await dbSave(os);
-      if (error) return { os, dbError: true };
+      if (error) {
+        // Enfileira para retry no próximo login/sync
+        this._pending.add(os.id);
+        this._savePending();
+        return { os, dbError: true };
+      }
     }
     return { os };
   }
@@ -81,16 +91,44 @@ class AppState {
     this._save();
     if (typeof dbSave === 'function') {
       const { error } = await dbSave(this._os[idx]);
-      if (error) return { os: this._os[idx], dbError: true };
+      if (error) {
+        this._pending.add(id);
+        this._savePending();
+        return { os: this._os[idx], dbError: true };
+      }
+      // Sucesso: remove da fila se estava pendente
+      this._pending.delete(id);
+      this._savePending();
     }
     return { os: this._os[idx] };
   }
 
   mergeFromCloud(remoteOS) {
-    // Substitui o estado local pelo dado vindo do Supabase
-    this._os = remoteOS;
+    const remoteIds = new Set(remoteOS.map(o => o.id));
+    // Mantém OS locais que ainda não chegaram ao Supabase (pendentes ou recém-criadas)
+    const localOnly = this._os.filter(o => !remoteIds.has(o.id));
+    this._os = [...remoteOS, ...localOnly];
     this._save();
   }
+
+  // Tenta reenviar ao Supabase todas as OS que falharam anteriormente
+  async syncPending() {
+    if (!this._pending.size || typeof dbSave !== 'function') return 0;
+    let synced = 0;
+    for (const id of [...this._pending]) {
+      const os = this._os.find(o => o.id === id);
+      if (!os) { this._pending.delete(id); continue; }
+      const { error } = await dbSave(os);
+      if (!error) {
+        this._pending.delete(id);
+        synced++;
+      }
+    }
+    this._savePending();
+    return synced;
+  }
+
+  get pendingCount() { return this._pending.size; }
 
   // Mini-dashboard metrics
   metrics() {
@@ -196,6 +234,12 @@ async function postLoginSetup() {
 
   const remoteOS = await dbLoadAll();
   if (remoteOS !== null) state.mergeFromCloud(remoteOS);
+
+  // Reenvia OS que falharam em uploads anteriores
+  const synced = await state.syncPending();
+  if (synced > 0) showToast(`${synced} OS sincronizada(s) com o servidor.`, 'success');
+  if (state.pendingCount > 0) showToast(`${state.pendingCount} OS aguardando sincronização — verifique sua conexão.`, 'error');
+
   renderDashboard();
 }
 
