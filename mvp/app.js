@@ -7,7 +7,6 @@
 
 // ── Constantes ────────────────────────────────────────────────
 const STORAGE_KEY  = 'oficina_pro_os';
-const CONFIG_KEY   = 'oficina_pro_config';
 
 const DEVICE_TYPES = ['Celular','Notebook','Tablet','Eletrodoméstico','TV','Câmera','Videogame','Outro'];
 
@@ -45,8 +44,7 @@ const OFICINA = {
 // ── State Manager ──────────────────────────────────────────────
 class AppState {
   constructor() {
-    this._os     = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    this._config = JSON.parse(localStorage.getItem(CONFIG_KEY) || 'null') || OFICINA;
+    this._os = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
 
     // OS mockadas para demo (inseridas apenas se o storage estiver vazio)
     if (this._os.length === 0) this._seedMockData();
@@ -99,7 +97,7 @@ class AppState {
     return (nums.length ? Math.max(...nums) : 0) + 1;
   }
 
-  create(data) {
+  async create(data) {
     const num = this.getNextNum();
     const os  = {
       ...data,
@@ -112,17 +110,23 @@ class AppState {
     };
     this._os.push(os);
     this._save();
-    if (typeof dbSave === 'function') dbSave(os).catch(e => console.error('[sync] Falha ao salvar OS:', e));
-    return os;
+    if (typeof dbSave === 'function') {
+      const { error } = await dbSave(os);
+      if (error) return { os, dbError: true };
+    }
+    return { os };
   }
 
-  update(id, patch) {
+  async update(id, patch) {
     const idx = this._os.findIndex(os => os.id === id);
-    if (idx === -1) return;
+    if (idx === -1) return { dbError: false };
     this._os[idx] = { ...this._os[idx], ...patch };
     this._save();
-    if (typeof dbSave === 'function') dbSave(this._os[idx]).catch(e => console.error('[sync] Falha ao atualizar OS:', e));
-    return this._os[idx];
+    if (typeof dbSave === 'function') {
+      const { error } = await dbSave(this._os[idx]);
+      if (error) return { os: this._os[idx], dbError: true };
+    }
+    return { os: this._os[idx] };
   }
 
   mergeFromCloud(remoteOS) {
@@ -574,8 +578,6 @@ function startNovaOS() {
   document.querySelectorAll('.condicao-cb').forEach(cb => cb.checked = false);
   // Reset pattern
   clearPattern();
-  // Preenchimento da data de entrada (hoje)
-  const today = new Date().toISOString().split('T')[0];
   const inputPrevisao = document.getElementById('input-previsao');
   if (inputPrevisao && !inputPrevisao.value) {
     const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 3);
@@ -856,10 +858,14 @@ function buildSummary() {
     </div>`;
 }
 
-function generateOS() {
+async function generateOS() {
   if (!checkProfileComplete()) return;
-  const os = state.create(wizardData);
-  showToast(`${os.id} criada com sucesso!`, 'success');
+  const { os, dbError } = await state.create(wizardData);
+  if (dbError) {
+    showToast(`${os.id} criada, mas falha ao salvar no servidor. Verifique sua conexão.`, 'error');
+  } else {
+    showToast(`${os.id} criada com sucesso!`, 'success');
+  }
   renderDashboard();
   currentOSId = os.id;
   renderOSView(os.id);
@@ -1056,13 +1062,23 @@ function removePhoto(idx) {
   document.getElementById('photo-count').textContent = wizardData.fotos.length;
 }
 
+function openPhotoLightbox(src) {
+  const overlay = document.createElement('div');
+  overlay.className = 'lightbox-overlay';
+  overlay.innerHTML = `<button class="lightbox-close" title="Fechar">✕</button><img src="${src}" alt="Foto ampliada">`;
+  const close = () => overlay.remove();
+  overlay.querySelector('.lightbox-close').onclick = close;
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+  document.body.appendChild(overlay);
+}
+
 // ── Visualização de OS ─────────────────────────────────────────
 function renderOSView(id) {
   const os = state.getById(id);
   if (!os) return;
 
   const photoHTML = os.fotos && os.fotos.length
-    ? `<div class="photo-grid">${os.fotos.map((src, i) => `<div class="photo-thumb"><img src="${src}" alt="Foto ${i+1}" loading="lazy"></div>`).join('')}</div>`
+    ? `<div class="photo-grid">${os.fotos.map((src, i) => `<div class="photo-thumb"><img src="${src}" alt="Foto ${i+1}" loading="lazy" onclick="openPhotoLightbox(this.src)"></div>`).join('')}</div>`
     : `<p class="text-muted" style="font-size:.8rem;font-style:italic">Sem fotos registradas.</p>`;
 
   const signHTML = os.assinatura?.status === 'signed'
@@ -1220,12 +1236,16 @@ function renderOSView(id) {
 
 function simulateSign(id) {
   // Simula assinatura após 3s (mock: cliente respondeu pelo WhatsApp)
-  setTimeout(() => {
+  setTimeout(async () => {
     const now = new Date();
     const hora = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-    state.update(id, { assinatura: { status: 'signed', hora }, status: 'andamento' });
+    const { dbError } = await state.update(id, { assinatura: { status: 'signed', hora }, status: 'andamento' });
     renderOSView(id);
-    showToast('Cliente assinou a OS digitalmente!', 'success');
+    if (dbError) {
+      showToast('Assinatura registrada localmente, mas falha ao sincronizar com o servidor.', 'error');
+    } else {
+      showToast('Cliente assinou a OS digitalmente!', 'success');
+    }
   }, 3000);
 }
 
@@ -1289,7 +1309,7 @@ function emitirNFSe() {
   document.getElementById('btn-emitir-nfse').classList.add('hidden');
 }
 
-function confirmarNumeroNFSe() {
+async function confirmarNumeroNFSe() {
   const numero = document.getElementById('nfse-numero-manual').value.trim();
   if (!numero || !/^\d{1,10}$/.test(numero)) {
     showToast('Informe o número da NFS-e (somente dígitos, máx. 10).', 'error');
@@ -1299,7 +1319,8 @@ function confirmarNumeroNFSe() {
   const nfseNum = `NFS-e Nº ${numero}`;
   const os = state.getById(currentOSId);
   if (os) {
-    state.update(currentOSId, { nfse: nfseNum, status: 'concluida' });
+    const { dbError } = await state.update(currentOSId, { nfse: nfseNum, status: 'concluida' });
+    if (dbError) showToast('NFS-e salva localmente, mas falha ao sincronizar com o servidor.', 'error');
   }
 
   // Exibe tela de sucesso
