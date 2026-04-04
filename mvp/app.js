@@ -1041,7 +1041,7 @@ function stampTimestamp(dataUrl, gps) {
           ctx.fillText(line, bx + padding, by + padding + fontSize + i * lineH);
         });
 
-        res(canvas.toDataURL('image/jpeg', 0.88));
+        res(canvas.toDataURL('image/jpeg', 0.75));
       } catch (e) {
         console.error('[stamp] Falha ao carimbar foto, usando original:', e);
         res(dataUrl); // retorna a foto sem carimbo em vez de bloquear
