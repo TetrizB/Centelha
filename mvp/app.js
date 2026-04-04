@@ -1104,6 +1104,10 @@ function renderOSView(id) {
     ? `<button class="btn btn-success btn-full mt-16" onclick="openNFSe('${os.id}')">
          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
          Concluir e Emitir NFS-e
+       </button>
+       <button class="btn btn-outline btn-full mt-8" onclick="concludeWithoutNFSe('${os.id}')">
+         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+         Concluir sem NFS-e
        </button>`
     : '';
 
@@ -1237,6 +1241,13 @@ function renderOSView(id) {
     ${concludeBtn}
     <button class="btn btn-ghost btn-full mt-8" onclick="navigate('screen-dashboard'); renderDashboard()">← Voltar ao painel</button>
   `;
+}
+
+async function concludeWithoutNFSe(id) {
+  if (!confirm('Concluir esta OS sem emitir NFS-e?')) return;
+  const { dbError } = await state.update(id, { status: 'concluida' });
+  renderOSView(id);
+  showToast(dbError ? 'OS concluída (falha ao sincronizar)' : 'OS concluída com sucesso!', dbError ? 'warning' : 'success');
 }
 
 function simulateSign(id) {
