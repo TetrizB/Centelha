@@ -57,11 +57,15 @@
 
 'use strict';
 
-const SUPABASE_URL = 'https://zfralmwyzpexqunynzfn.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_ghjU1tbRqbdTIWCsuD-PnQ_ZRpk3ZpQ';
+const SUPABASE_URL = 'https://vpjleuxialhmxuopdzjt.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_F4Gu7ij9MfuRqArsmhbhYA_GFQzPuLQ';
 
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-  auth: { persistSession: true, autoRefreshToken: true },
+  auth: {
+    persistSession:    true,
+    autoRefreshToken:  true,
+    detectSessionInUrl: true,
+  },
 });
 
 // ── Sessão ──────────────────────────────────────────────────────

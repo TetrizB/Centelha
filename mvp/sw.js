@@ -5,7 +5,7 @@
                Cache apenas como fallback offline.
    ============================================================ */
 
-const CACHE_NAME = 'oficina-pro-v3';
+const CACHE_NAME = 'oficina-pro-v4';
 const APP_SHELL = [
   './',
   './index.html',
