@@ -1,0 +1,89 @@
+/* ============================================================
+   print.css — Estilos de impressão/PDF da Ordem de Serviço (A4).
+   EDITE AQUI: layout do documento impresso.
+   ============================================================ */
+/* ── Print Styles ──────────────────────────────────────────── */
+@page { size: A4 portrait; margin: 8mm 10mm; }
+
+@media print {
+  /* Forçar cores exatas mesmo em fundo colorido */
+  *, *::before, *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    box-sizing: border-box;
+  }
+
+  /* Mostrar apenas a tela da OS */
+  html, body { background: #fff !important; height: auto; overflow: visible; }
+  .main-content { padding: 0 !important; max-width: 100% !important; overflow: visible; }
+  .top-bar, .bottom-nav, .action-row, .btn, #toast { display: none !important; }
+  .screen { display: none !important; }
+  #screen-os-view { display: block !important; }
+
+  /* Documento */
+  .os-document {
+    box-shadow: none !important;
+    border: 1.5px solid #1a365d !important;
+    border-radius: 4px !important;
+    page-break-inside: avoid;
+  }
+  .os-doc-header { padding: 8px 12px !important; }
+  .os-doc-header .os-num { font-size: 1rem !important; }
+
+  /* Layout 2 colunas: seções 1 e 2 lado a lado, demais em linha cheia */
+  .os-doc-body {
+    padding: 8px 12px !important;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    column-gap: 14px !important;
+    row-gap: 0 !important;
+    align-items: start !important;
+  }
+  .os-doc-section:nth-child(n+3) { grid-column: 1 / -1 !important; }
+
+  /* Tipografia compacta */
+  .os-doc-section {
+    margin-bottom: 5px !important;
+    padding-bottom: 5px !important;
+    break-inside: avoid;
+  }
+  .os-doc-section h4 { font-size: .62rem !important; margin-bottom: 4px !important; }
+  .os-field-row { margin-bottom: 2px !important; }
+  .os-field-label { font-size: .68rem !important; }
+  .os-field-value { font-size: .68rem !important; max-width: 65% !important; }
+
+  /* Tabela de itens compacta */
+  .os-doc-body table { margin-top: 2px !important; }
+  .os-doc-body table th,
+  .os-doc-body table td { font-size: .65rem !important; padding: 2px 4px !important; }
+
+  /* Ocultar fotos (pesadas, não cabem em A4) */
+  .photo-grid { display: none !important; }
+  .os-doc-section:has(.photo-grid) { display: none !important; }
+
+  /* Assinatura: se pendente → linha para assinar fisicamente */
+  .sign-status { padding: 4px 8px !important; font-size: .68rem !important; break-inside: avoid; }
+  .sign-status.pending {
+    background: none !important;
+    border: 1px solid #ccc !important;
+    color: #333 !important;
+    padding: 8px !important;
+    min-height: 38px !important;
+  }
+  .sign-status.pending svg { display: none !important; }
+  .sign-status.pending::before {
+    content: 'Assinatura do cliente: ____________________________________________   Data: ____/____/________';
+    font-size: .68rem;
+    color: #555;
+    font-style: italic;
+    display: block;
+  }
+
+  /* Badges menores */
+  .badge { font-size: .62rem !important; padding: 2px 6px !important; }
+
+  /* Termos compactos */
+  .os-doc-section li { font-size: .62rem !important; }
+  .os-doc-section ol { padding-left: 12px !important; gap: 1px !important; }
+}
+

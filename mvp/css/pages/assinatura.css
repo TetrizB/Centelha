@@ -1,0 +1,69 @@
+/* ============================================================
+   pages/assinatura.css — Modal de assinatura digital do cliente.
+   ============================================================ */
+/* ── Assinatura digital (modal) ─────────────────────────────── */
+.sign-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, .72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+.sign-modal.hidden { display: none; }
+.sign-modal-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px;
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, .35);
+}
+.sign-modal-info {
+  font-size: .8rem;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+.sign-canvas {
+  width: 100%;
+  height: 180px;
+  border: 2px dashed #cbd5e0;
+  border-radius: 12px;
+  background: #f8fafc;
+  touch-action: none;
+  cursor: crosshair;
+  display: block;
+}
+.sign-legal {
+  font-size: .68rem;
+  color: var(--muted);
+  margin-top: 10px;
+  line-height: 1.45;
+}
+.sign-image {
+  display: block;
+  max-width: 240px;
+  max-height: 90px;
+  margin-top: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  padding: 4px 8px;
+}
+.sign-audit {
+  margin-top: 8px;
+  font-size: .7rem;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.sign-audit code {
+  font-size: .68rem;
+  background: #f0f4f8;
+  padding: 1px 5px;
+  border-radius: 4px;
+  word-break: break-all;
+}

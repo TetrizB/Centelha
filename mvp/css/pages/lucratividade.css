@@ -1,0 +1,71 @@
+/* ============================================================
+   pages/lucratividade.css — Tela de lucratividade: gráfico de
+   barras e tabela de ranking.
+   ============================================================ */
+/* ── Lucratividade ─────────────────────────────────────────── */
+.lucro-table-wrap { overflow-x: auto; }
+.lucro-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .82rem;
+}
+.lucro-table th {
+  background: var(--primary);
+  color: #fff;
+  padding: 10px 12px;
+  text-align: left;
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.lucro-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.lucro-table tr:hover td { background: #f8faff; }
+.lucro-table tr.top-1 td { background: #fffbeb; }
+.rank-medal {
+  font-size: .85rem;
+  font-weight: 700;
+  width: 28px;
+  text-align: center;
+}
+
+.bar-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bar-label {
+  font-size: .75rem;
+  color: var(--text-light);
+  flex-shrink: 0;
+  width: 110px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bar-track {
+  flex: 1;
+  height: 20px;
+  background: var(--border);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+  transition: width 1s cubic-bezier(.4,0,.2,1);
+  display: flex; align-items: center; justify-content: flex-end; padding-right: 6px;
+}
+.bar-fill span { font-size: .65rem; font-weight: 700; color: #fff; }
+.bar-value { font-size: .75rem; font-weight: 700; color: var(--primary); flex-shrink: 0; width: 52px; text-align: right; }
+

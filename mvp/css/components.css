@@ -1,0 +1,203 @@
+/* ============================================================
+   components.css — Componentes reutilizáveis: cards, métricas,
+   botões, lista de OS e badges de status.
+   ============================================================ */
+/* ── Cards ─────────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
+}
+.card + .card { margin-top: 12px; }
+
+/* ── Metrics Strip ─────────────────────────────────────────── */
+.metrics-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.metric-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 14px 10px;
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
+}
+.metric-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--primary);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.metric-value.accent { color: var(--accent); }
+.metric-label { font-size: .7rem; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: .5px; }
+
+/* ── Hero CTA ──────────────────────────────────────────────── */
+.hero-cta {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
+  gap: 12px;
+}
+.hero-cta-text h2 { color: #fff; font-size: 1.1rem; }
+.hero-cta-text p { color: rgba(255,255,255,.8); font-size: .8rem; margin-top: 2px; }
+
+/* ── Buttons ───────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: var(--radius-sm);
+  font-size: .9rem;
+  font-weight: 600;
+  transition: var(--transition);
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:active { transform: scale(.97); }
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(237,137,54,.35);
+}
+.btn-primary:hover { background: var(--accent-dark); box-shadow: 0 6px 16px rgba(237,137,54,.45); }
+.btn-secondary {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(26,54,93,.3);
+}
+.btn-secondary:hover { background: var(--primary-light); }
+.btn-outline {
+  background: transparent;
+  color: var(--primary);
+  border: 2px solid var(--primary);
+}
+.btn-outline:hover { background: var(--primary); color: #fff; }
+.btn-ghost {
+  background: transparent;
+  color: var(--text-light);
+  padding: 10px 16px;
+}
+.btn-ghost:hover { background: var(--bg); }
+.btn-success {
+  background: var(--success);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(56,161,105,.3);
+}
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-sm { padding: 8px 14px; font-size: .8rem; }
+.btn-lg { padding: 16px 28px; font-size: 1rem; border-radius: var(--radius); }
+.btn-full { width: 100%; }
+.btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+/* ── OS List ───────────────────────────────────────────────── */
+.os-list { display: flex; flex-direction: column; gap: 10px; }
+.os-item {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: var(--transition);
+}
+.os-item:hover { box-shadow: var(--shadow); transform: translateY(-1px); border-color: var(--primary); }
+.os-icon {
+  width: 44px; height: 44px;
+  border-radius: 10px;
+  background: #ebf4ff;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.os-info { flex: 1; min-width: 0; }
+.os-number { font-size: .75rem; color: var(--muted); font-weight: 500; }
+.os-client { font-weight: 600; font-size: .95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.os-device { font-size: .8rem; color: var(--text-light); }
+.os-meta { text-align: right; flex-shrink: 0; }
+.os-value { font-weight: 700; color: var(--primary); font-size: .9rem; }
+
+/* ── Status Badges ─────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 20px;
+  font-size: .7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+}
+.badge-waiting  { background: #fef3c7; color: #92400e; }
+.badge-approval { background: #fce7f3; color: #9d174d; }
+.badge-parts    { background: #ffedd5; color: #9a3412; }
+.badge-progress { background: #dbeafe; color: #1e40af; }
+.badge-ready    { background: #cffafe; color: #155e75; }
+.badge-done     { background: #d1fae5; color: #065f46; }
+.badge-nfse     { background: #ede9fe; color: #5b21b6; }
+
+/* ── Busca e filtros de OS (dashboard) ─────────────────────── */
+.os-search {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 16px; /* >= 16px evita zoom no iOS */
+  background: var(--surface);
+  margin-bottom: 10px;
+  transition: var(--transition);
+}
+.os-search:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(26,54,93,.12);
+}
+.status-chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.status-chips::-webkit-scrollbar { display: none; }
+.status-chip {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--text-light);
+  font-size: .72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: var(--transition);
+}
+.status-chip.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.os-list-footer {
+  text-align: center;
+  margin-top: 10px;
+}
+

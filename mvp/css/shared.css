@@ -1,0 +1,94 @@
+/* ============================================================
+   shared.css — Componentes compartilhados: resumo, cabeçalho de
+   seção, toast (notificação), linha de ações, estado vazio, chip.
+   ============================================================ */
+/* ── Summary Review ────────────────────────────────────────── */
+.summary-card {
+  background: linear-gradient(135deg, #ebf4ff, #f0fff4);
+  border: 1px solid #bee3f8;
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(0,0,0,.06);
+  font-size: .875rem;
+}
+.summary-row:last-child { border-bottom: none; }
+.summary-key { color: var(--muted); font-weight: 500; }
+.summary-val { font-weight: 700; color: var(--text); text-align: right; }
+.summary-val.big { font-size: 1.2rem; color: var(--primary); }
+
+/* ── Section Header ────────────────────────────────────────── */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.section-header h3 { font-size: .95rem; }
+
+/* ── Toast Notification ────────────────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--primary-dark);
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: var(--radius-sm);
+  font-size: .875rem;
+  font-weight: 500;
+  box-shadow: var(--shadow-lg);
+  z-index: 999;
+  opacity: 0;
+  transition: all .3s cubic-bezier(.4,0,.2,1);
+  max-width: calc(100vw - 48px);
+  text-align: center;
+}
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.toast.success { background: var(--success); }
+.toast.error   { background: var(--danger); }
+
+/* ── Action Row ────────────────────────────────────────────── */
+.action-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+.action-row .btn { flex: 1; }
+
+/* ── Empty State ───────────────────────────────────────────── */
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--muted);
+}
+.empty-state svg { opacity: .3; margin: 0 auto 12px; }
+.empty-state p { font-size: .875rem; }
+
+/* ── Divider ───────────────────────────────────────────────── */
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 16px 0;
+}
+
+/* ── Chip ──────────────────────────────────────────────────── */
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: #ebf4ff;
+  color: var(--primary);
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: .75rem;
+  font-weight: 600;
+}
+

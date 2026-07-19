@@ -1,4 +1,10 @@
 <!DOCTYPE html>
+<!-- ============================================================
+     OficinaPRO — página única (SPA)
+     Cada "tela" do app é uma <section class="screen" id="screen-...">
+     dentro de <main>. A lógica de cada tela fica em js/pages/.
+     Guia completo de edição: COMO-EDITAR.md (nesta pasta).
+     ============================================================ -->
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -8,6 +14,9 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://vpjleuxialhmxuopdzjt.supabase.co wss://vpjleuxialhmxuopdzjt.supabase.co https://nominatim.openstreetmap.org https://viacep.com.br; frame-src 'none'; object-src 'none';">
 
 
+  <!-- Favicon (aba do navegador) -->
+  <link rel="icon" type="image/svg+xml" href="assets/icons/icon.svg">
+
   <!-- PWA / Android -->
   <meta name="mobile-web-app-capable" content="yes">
   <link rel="manifest" href="manifest.json">
@@ -16,10 +25,24 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="OficinaPRO">
-  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="apple-touch-icon" href="assets/icons/icon.svg">
 
   <title>OficinaPRO</title>
-  <link rel="stylesheet" href="style.css">
+
+  <!-- ATENÇÃO: a ORDEM dos arquivos CSS importa (regras posteriores vencem).
+       Se adicionar um arquivo novo, mantenha esta sequência. -->
+  <link rel="stylesheet" href="css/base.css">                 <!-- variáveis (cores/fontes), reset -->
+  <link rel="stylesheet" href="css/layout.css">               <!-- barra superior, navegação, telas -->
+  <link rel="stylesheet" href="css/components.css">           <!-- cards, botões, badges, lista de OS -->
+  <link rel="stylesheet" href="css/pages/nova-os.css">        <!-- wizard, formulários, fotos -->
+  <link rel="stylesheet" href="css/pages/os-view.css">        <!-- documento da OS, NFS-e, spinner -->
+  <link rel="stylesheet" href="css/pages/lucratividade.css">  <!-- gráfico e ranking -->
+  <link rel="stylesheet" href="css/shared.css">               <!-- resumo, toast, estado vazio... -->
+  <link rel="stylesheet" href="css/print.css">                <!-- impressão/PDF da OS -->
+  <link rel="stylesheet" href="css/overrides.css">            <!-- responsivo, utilitários, ajustes -->
+  <link rel="stylesheet" href="css/pages/login.css">          <!-- tela de login -->
+  <link rel="stylesheet" href="css/pages/configuracoes.css">  <!-- configurações e onboarding -->
+  <link rel="stylesheet" href="css/pages/assinatura.css">     <!-- modal de assinatura -->
 </head>
 <body>
 
@@ -111,15 +134,22 @@
         </button>
       </div>
 
-      <!-- Lista de OSs -->
+      <!-- Lista de OSs: busca + filtros por status -->
       <div class="section-header">
-        <h3>Ordens de Serviço Recentes</h3>
+        <h3>Ordens de Serviço</h3>
         <span class="chip">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
           Salvas localmente
         </span>
       </div>
+      <input id="os-search" class="os-search" type="search"
+             placeholder="Buscar por cliente, telefone, IMEI ou nº da OS..."
+             oninput="dashSearch(this.value)">
+      <div id="status-chips" class="status-chips">
+        <!-- chips gerados por renderDashboard() conforme OS_STATUS -->
+      </div>
       <div id="os-list" class="os-list"></div>
+      <div id="os-list-footer" class="os-list-footer"></div>
 
       <!-- Banner jurídico -->
       <div class="juridic-banner mt-16">
@@ -169,7 +199,10 @@
             </div>
             <div class="form-group">
               <label class="form-label" for="input-telefone">Telefone / WhatsApp <span class="required">*</span></label>
-              <input id="input-telefone" class="form-control" type="tel" placeholder="(11) 99999-0000" autocomplete="tel">
+              <input id="input-telefone" class="form-control" type="tel" placeholder="(11) 99999-0000" autocomplete="tel"
+                     oninput="lookupClienteRecorrente(this)">
+              <!-- Sugestão de cliente recorrente (preenchida por cliente-lookup.js) -->
+              <div id="cliente-sugerido" class="hidden"></div>
             </div>
             <div class="form-group">
               <label class="form-label" for="input-cpf">CPF</label>
@@ -669,6 +702,13 @@
         </p>
       </div>
 
+      <button class="btn btn-outline btn-full mt-12" onclick="exportCSV()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Exportar relatório (CSV)
+      </button>
+
     </section>
 
     <!-- ════════════════════════════════════════════════════
@@ -684,10 +724,10 @@
 
       <!-- Tabs -->
       <div class="config-tabs">
-        <button class="config-tab active" id="ctab-empresa"  onclick="switchConfigTab('empresa')">🏢 Empresa</button>
-        <button class="config-tab"        id="ctab-endereco" onclick="switchConfigTab('endereco')">📍 Endereço</button>
-        <button class="config-tab"        id="ctab-os"       onclick="switchConfigTab('os')">📋 OS</button>
-        <button class="config-tab"        id="ctab-fiscal"   onclick="switchConfigTab('fiscal')">🧾 Fiscal</button>
+        <button class="config-tab active" id="ctab-empresa"  onclick="switchConfigTab('empresa')">Empresa</button>
+        <button class="config-tab"        id="ctab-endereco" onclick="switchConfigTab('endereco')">Endereço</button>
+        <button class="config-tab"        id="ctab-os"       onclick="switchConfigTab('os')">OS</button>
+        <button class="config-tab"        id="ctab-fiscal"   onclick="switchConfigTab('fiscal')">Fiscal</button>
       </div>
 
       <!-- ── Tab: Empresa ── -->
@@ -805,8 +845,8 @@
         <div class="form-group">
           <label class="form-label">Ambiente de Emissão</label>
           <div class="toggle-row">
-            <button id="btn-homologacao" class="toggle-btn active" onclick="setAmbiente('homologacao')">🧪 Homologação</button>
-            <button id="btn-producao"    class="toggle-btn"        onclick="setAmbiente('producao')">🚀 Produção</button>
+            <button id="btn-homologacao" class="toggle-btn active" onclick="setAmbiente('homologacao')">Homologação</button>
+            <button id="btn-producao"    class="toggle-btn"        onclick="setAmbiente('producao')">Produção</button>
           </div>
           <small class="form-hint" id="ambiente-hint">Use Homologação para testes antes de emitir notas reais</small>
         </div>
@@ -864,21 +904,81 @@
 
 </div><!-- /#app -->
 
+<!-- Modal de assinatura digital do cliente (entrada E retirada — o
+     título e o texto legal mudam conforme o modo, ver assinatura.js) -->
+<div id="sign-modal" class="sign-modal hidden">
+  <div class="sign-modal-card">
+    <h3 id="sign-modal-title" style="margin-bottom:4px">Assinatura do Cliente</h3>
+    <p id="sign-modal-info" class="sign-modal-info"></p>
+    <canvas id="sign-canvas" class="sign-canvas"></canvas>
+    <p id="sign-legal-text" class="sign-legal">
+      Ao assinar, o cliente declara que conferiu os dados da OS, aceita os termos e
+      condições do serviço e autoriza o tratamento dos seus dados para essa finalidade (LGPD).
+    </p>
+    <div class="action-row mt-8">
+      <button class="btn btn-outline" onclick="clearSignature()">Limpar</button>
+      <button class="btn btn-ghost" onclick="closeSignModal()">Cancelar</button>
+    </div>
+    <button class="btn btn-primary btn-full mt-8" onclick="confirmSignature()">Confirmar assinatura</button>
+  </div>
+</div>
+
+<!-- Modal de edição da OS (diagnóstico, itens, previsão) -->
+<div id="edit-modal" class="edit-modal hidden">
+  <div class="edit-modal-card">
+    <h3 style="margin-bottom:4px">Editar OS</h3>
+    <p id="edit-modal-info" class="sign-modal-info"></p>
+
+    <div class="form-group">
+      <label class="form-label" for="edit-diagnostico">Diagnóstico / Observações do técnico</label>
+      <textarea id="edit-diagnostico" class="form-control" rows="3"
+                placeholder="Ex: Conector de carga oxidado, necessária troca..."></textarea>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Itens, peças e mão de obra</label>
+      <table style="width:100%;border-collapse:collapse;font-size:.8rem">
+        <thead><tr style="background:#f0f4f8">
+          <th style="padding:4px 6px;text-align:left">Qt</th>
+          <th style="padding:4px 6px;text-align:left">Descrição</th>
+          <th style="padding:4px 6px;text-align:right">Unit.</th>
+          <th style="padding:4px 6px;text-align:right">Total</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="edit-itens-tbody"><!-- linhas geradas por editar.js --></tbody>
+      </table>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+        <button type="button" class="btn btn-ghost" style="font-size:.78rem" onclick="addEditItemRow()">+ Adicionar item</button>
+        <strong id="edit-itens-total" style="color:var(--primary)">R$ 0,00</strong>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group" style="flex:1">
+        <label class="form-label" for="edit-valor">Valor total (R$)</label>
+        <input id="edit-valor" class="form-control" type="number" min="0" step="0.01"
+               title="Usado apenas quando não há itens na tabela">
+      </div>
+      <div class="form-group" style="flex:1">
+        <label class="form-label" for="edit-previsao">Previsão de saída</label>
+        <input id="edit-previsao" class="form-control" type="date">
+      </div>
+    </div>
+
+    <div class="action-row mt-8">
+      <button class="btn btn-ghost" onclick="closeEditOS()">Cancelar</button>
+      <button class="btn btn-primary" id="btn-salvar-edicao" onclick="saveEditOS()">Salvar alterações</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast global -->
 <div id="toast" class="toast"></div>
 
+<!-- Biblioteca do Supabase (CDN) — precisa vir antes do main.js -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="supabase.js"></script>
-<script src="app.js"></script>
 
-<!-- Registro do Service Worker (PWA offline + instalável) -->
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js')
-        .catch(() => {}); // falha silenciosa se offline ou bloqueado
-    });
-  }
-</script>
+<!-- Ponto de entrada do app (módulos ES em js/) -->
+<script type="module" src="js/main.js"></script>
 </body>
 </html>
