@@ -22,7 +22,7 @@ const TOTAL_STEPS = 3;
 
 /** Reseta o wizard e abre a tela (botão "Nova OS" da navegação). */
 export function startNovaOS() {
-  wizard.data = { fotos: [], condicoes: [], senhaParao: [], itens: [] };
+  wizard.data = { fotos: [], fotoMeta: [], condicoes: [], senhaParao: [], itens: [] };
   wizard.step = 1;
   wizard.pattern = [];
   wizard.rowCount = 0;
@@ -205,7 +205,21 @@ export function buildSummary() {
 
 async function generateOS() {
   if (!checkProfileComplete()) return;
-  const { os, dbError, fotoWarn } = await state.create(wizard.data);
+
+  // Feedback imediato: salvar com fotos pode levar alguns segundos no 4G
+  const btnNext = document.getElementById('btn-next');
+  btnNext.disabled    = true;
+  btnNext.textContent = 'Salvando OS...';
+
+  let resultado;
+  try {
+    resultado = await state.create(wizard.data);
+  } finally {
+    btnNext.disabled    = false;
+    btnNext.textContent = 'Gerar Ordem de Serviço';
+  }
+
+  const { os, dbError, fotoWarn } = resultado;
   if (dbError) {
     showToast(`${os.id} criada, mas falha ao salvar no servidor. Verifique sua conexão.`, 'error');
   } else if (fotoWarn) {

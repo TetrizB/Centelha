@@ -85,6 +85,12 @@
       <span>OficinaPRO</span>
     </div>
     <div class="nav-actions">
+      <!-- Indicador de sincronização (conteúdo controlado por js/core/sync-indicator.js) -->
+      <button id="sync-indicator" class="icon-btn sync-ok" title="Sincronizado" onclick="forceSyncPending()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 10h-1.26A8 8 0 109 20h9a5 5 0 000-10z"/>
+        </svg>
+      </button>
       <button class="icon-btn" title="Configurações da oficina" onclick="navigate('screen-configuracoes'); renderSettings()">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
@@ -106,19 +112,20 @@
     ════════════════════════════════════════════════════ -->
     <section id="screen-dashboard" class="screen active">
 
-      <!-- Mini-dashboard métricas -->
+      <!-- Métricas acionáveis: "Atrasadas" é clicável e filtra a lista -->
       <div class="metrics-strip">
         <div class="metric-card">
-          <div class="metric-value" id="metric-os-hoje">0</div>
-          <div class="metric-label">OS hoje</div>
+          <div class="metric-value" id="metric-abertas">0</div>
+          <div class="metric-label">Em aberto</div>
         </div>
+        <button type="button" class="metric-card metric-card--btn" id="metric-card-atrasadas"
+                onclick="dashFilterAtrasadas()" title="Ver OS com previsão vencida">
+          <div class="metric-value" id="metric-atrasadas">0</div>
+          <div class="metric-label">Atrasadas</div>
+        </button>
         <div class="metric-card">
           <div class="metric-value accent" id="metric-faturamento">R$0</div>
-          <div class="metric-label">Faturado</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-value" id="metric-nfse">0</div>
-          <div class="metric-label">NF emitidas</div>
+          <div class="metric-label">Faturado hoje</div>
         </div>
       </div>
 
@@ -910,6 +917,7 @@
   <div class="sign-modal-card">
     <h3 id="sign-modal-title" style="margin-bottom:4px">Assinatura do Cliente</h3>
     <p id="sign-modal-info" class="sign-modal-info"></p>
+    <p class="sign-rotate-hint">Dica: gire o aparelho na horizontal para uma assinatura mais confortável.</p>
     <canvas id="sign-canvas" class="sign-canvas"></canvas>
     <p id="sign-legal-text" class="sign-legal">
       Ao assinar, o cliente declara que conferiu os dados da OS, aceita os termos e
@@ -971,6 +979,9 @@
     </div>
   </div>
 </div>
+
+<!-- Progresso de upload de fotos (controlado por js/core/upload-progress.js) -->
+<div id="upload-progress" class="upload-progress hidden" role="status"></div>
 
 <!-- Toast global -->
 <div id="toast" class="toast"></div>

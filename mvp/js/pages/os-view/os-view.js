@@ -103,6 +103,22 @@ function buildPhotoHTML(os) {
   return `<p class="text-muted" style="font-size:.8rem;font-style:italic">Sem fotos registradas.</p>`;
 }
 
+/**
+ * Nota de evidência sob a grade de fotos: onde e quando as fotos
+ * foram registradas (o carimbo também está gravado em cada imagem).
+ */
+function buildFotoEvidenciaNota(os) {
+  if (!(os.fotos?.length || os.fotoPaths?.length)) return '';
+  const meta = os.fotoMeta?.[0];
+  const local = meta?.local ? ` em ${escHtml(meta.local)}` : '';
+  const quando = meta?.quando ? ` — ${formatDate(meta.quando)}` : '';
+  return `<p class="foto-evidencia-nota">
+    Fotos de vistoria registradas${local}${quando}.
+    Cada imagem possui carimbo de data, hora e coordenadas GPS gravado de forma
+    permanente, comprovando o estado do aparelho no momento da entrada.
+  </p>`;
+}
+
 /** Bloco de uma assinatura registrada (entrada ou retirada). */
 function signedBlockHTML(a, titulo) {
   return `
@@ -189,6 +205,7 @@ export function renderOSView(id) {
     <div class="os-document">
       <div class="os-doc-header">
         <div>
+          ${currentProfile?.nome_fantasia ? `<div class="os-doc-empresa">${escHtml(currentProfile.nome_fantasia)}</div>` : ''}
           <div style="font-size:.72rem;opacity:.7;text-transform:uppercase;letter-spacing:.5px">Ordem de Serviço</div>
           <div class="os-num">${os.id}</div>
           <div style="font-size:.78rem;opacity:.8;margin-top:4px">${formatDate(os.dataCriacao)}</div>
@@ -257,6 +274,7 @@ export function renderOSView(id) {
         <div class="os-doc-section">
           <h4>Registro fotográfico (${(os.fotos?.length || os.fotoPaths?.length || 0)} foto(s))</h4>
           ${photoHTML}
+          ${buildFotoEvidenciaNota(os)}
         </div>
 
         <div class="os-doc-section">

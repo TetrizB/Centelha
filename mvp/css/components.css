@@ -201,3 +201,35 @@
   margin-top: 10px;
 }
 
+
+/* ── Métricas acionáveis ────────────────────────────────────── */
+.metric-card--btn {
+  font-family: var(--font);
+  cursor: pointer;
+  transition: var(--transition);
+}
+.metric-card--btn:active { transform: scale(.97); }
+/* Estado com atraso: o vermelho é reservado para urgência real */
+.metric-card--btn.has-atraso {
+  border-color: #feb2b2;
+  background: #fff5f5;
+}
+.metric-card--btn.has-atraso .metric-value { color: var(--danger); }
+.metric-card--btn.has-atraso .metric-label { color: #c53030; }
+/* Filtro de atrasadas ativo */
+.metric-card--btn.filtro-ativo { box-shadow: 0 0 0 2px var(--danger); }
+
+/* ── Card de OS com previsão vencida ────────────────────────── */
+.os-item--atrasada { border-left: 3px solid var(--danger); }
+.os-atraso-info {
+  font-size: .68rem;
+  font-weight: 600;
+  color: var(--danger);
+  margin-top: 2px;
+}
+
+/* Chip de filtro "Atrasadas" */
+.status-chip.chip-danger.active {
+  background: var(--danger);
+  border-color: var(--danger);
+}

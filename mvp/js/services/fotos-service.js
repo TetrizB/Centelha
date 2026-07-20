@@ -17,24 +17,37 @@ function dataUrlToBlob(dataUrl) {
   return new Blob([arr], { type: mime });
 }
 
+// Notifica a interface sobre o andamento do upload (ver core/upload-progress.js)
+function emitirProgresso(detail) {
+  window.dispatchEvent(new CustomEvent('fotos-upload', { detail }));
+}
+
 /** Sobe fotos base64 para o Storage. Retorna { paths, error }. */
 export async function dbUploadFotos(osId, fotosBase64) {
   const session = await dbGetSession();
   if (!session) return { paths: null, error: { message: 'Sessão expirada. Faça login novamente.' } };
 
+  const total = fotosBase64.length;
+  emitirProgresso({ fase: 'inicio', total });
+
   const paths = [];
-  for (let i = 0; i < fotosBase64.length; i++) {
-    const path = `${session.user.id}/${osId}/${Date.now()}-${i}.jpg`;
-    const { error } = await db.storage
-      .from(FOTOS_BUCKET)
-      .upload(path, dataUrlToBlob(fotosBase64[i]), { contentType: 'image/jpeg', upsert: true });
-    if (error) {
-      console.error('[Storage] upload:', error.message);
-      return { paths: null, error };
+  try {
+    for (let i = 0; i < total; i++) {
+      emitirProgresso({ fase: 'progresso', atual: i + 1, total });
+      const path = `${session.user.id}/${osId}/${Date.now()}-${i}.jpg`;
+      const { error } = await db.storage
+        .from(FOTOS_BUCKET)
+        .upload(path, dataUrlToBlob(fotosBase64[i]), { contentType: 'image/jpeg', upsert: true });
+      if (error) {
+        console.error('[Storage] upload:', error.message);
+        return { paths: null, error };
+      }
+      paths.push(path);
     }
-    paths.push(path);
+    return { paths, error: null };
+  } finally {
+    emitirProgresso({ fase: 'fim' });
   }
-  return { paths, error: null };
 }
 
 /** URLs assinadas (válidas por 1h) para exibir fotos guardadas no Storage. */

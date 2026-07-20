@@ -12,6 +12,19 @@
 import { STORAGE_KEY, PENDING_KEY } from '../config/constants.js';
 import { dbSave } from '../services/os-service.js';
 import { showToast } from '../utils/dom.js';
+import { updateSyncIndicator } from './sync-indicator.js';
+
+/** Data local de hoje no formato YYYY-MM-DD (mesmo formato do input date). */
+function hojeLocal() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Uma OS está atrasada quando a previsão de saída já passou e ela não foi entregue. */
+export function isOSAtrasada(os) {
+  if (!os.previsao || os.status === 'concluida') return false;
+  return os.previsao < hojeLocal();
+}
 
 class AppState {
   constructor() {
@@ -37,6 +50,8 @@ class AppState {
     } catch (e) {
       console.error('[Storage] Falha ao gravar fila de pendências:', e);
     }
+    // Mantém a nuvem da barra superior sempre fiel à fila
+    updateSyncIndicator({ pending: this._pending.size });
   }
 
   getAll()    { return [...this._os].reverse(); }
@@ -60,7 +75,9 @@ class AppState {
     };
     this._os.push(os);
     this._save();
+    updateSyncIndicator({ syncing: true });
     const { error, fotoPaths, fotoError } = await dbSave(os);
+    updateSyncIndicator({ syncing: false });
     if (error) {
       this._pending.add(os.id);
       this._savePending();
@@ -81,7 +98,9 @@ class AppState {
     if (idx === -1) return { dbError: false };
     this._os[idx] = { ...this._os[idx], ...patch };
     this._save();
+    updateSyncIndicator({ syncing: true });
     const { error, fotoPaths, fotoError } = await dbSave(this._os[idx]);
+    updateSyncIndicator({ syncing: false });
     if (error) {
       this._pending.add(id);
       this._savePending();
@@ -129,6 +148,7 @@ class AppState {
   // Reenvia OS pendentes ao Supabase
   async syncPending() {
     if (!this._pending.size) return { synced: 0, lastError: null };
+    updateSyncIndicator({ syncing: true });
     let synced = 0, lastError = null;
     for (const id of [...this._pending]) {
       const os = this._os.find(o => o.id === id);
@@ -141,6 +161,7 @@ class AppState {
       synced++;
     }
     this._savePending();
+    updateSyncIndicator({ syncing: false });
     return { synced, lastError };
   }
 
@@ -156,10 +177,14 @@ class AppState {
 
   metrics() {
     const hoje = new Date().toDateString();
-    const osHoje      = this._os.filter(o => new Date(o.dataCriacao).toDateString() === hoje);
-    const faturamento = osHoje.filter(o => o.status === 'concluida').reduce((a, o) => a + (o.valor || 0), 0);
-    const nfsEmitidas = this._os.filter(o => o.nfse !== null).length;
-    return { total: osHoje.length, faturamento, nfsEmitidas };
+    // Faturado hoje: OS concluídas hoje (pela data de entrega, quando existir)
+    const faturamento = this._os
+      .filter(o => o.status === 'concluida' &&
+                   new Date(o.dataEntrega || o.dataCriacao).toDateString() === hoje)
+      .reduce((a, o) => a + (o.valor || 0), 0);
+    const emAberto  = this._os.filter(o => o.status !== 'concluida').length;
+    const atrasadas = this._os.filter(isOSAtrasada).length;
+    return { emAberto, atrasadas, faturamento };
   }
 }
 

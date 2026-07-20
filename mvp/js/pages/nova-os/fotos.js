@@ -33,6 +33,14 @@ export async function handlePhotoCapture(input) {
       const dataUrl = await fileToDataUrl(file);
       const stamped = await stampTimestamp(dataUrl, gps);
       wizard.data.fotos.push(stamped);
+      // Metadados estruturados da captura (exibidos no documento da OS)
+      wizard.data.fotoMeta = wizard.data.fotoMeta || [];
+      wizard.data.fotoMeta.push({
+        quando: new Date().toISOString(),
+        local:  gps.lat !== null ? gps.locStr : null,
+        lat:    gps.lat,
+        lon:    gps.lon,
+      });
       processadas++;
       // Atualiza preview progressivamente (foto a foto)
       renderPhotoPreviews();
@@ -139,17 +147,100 @@ export function renderPhotoPreviews() {
 
 export function removePhoto(idx) {
   wizard.data.fotos.splice(idx, 1);
+  if (wizard.data.fotoMeta) wizard.data.fotoMeta.splice(idx, 1);
   renderPhotoPreviews();
   document.getElementById('photo-count').textContent = wizard.data.fotos.length;
 }
 
-/** Amplia uma foto em tela cheia (usado também na visualização da OS). */
+// ── Lightbox com zoom ──────────────────────────────────────────
+// Pinça (2 dedos), duplo toque e roda do mouse — para inspecionar
+// o detalhe do arranhão que justifica a foto de vistoria.
+
+const ZOOM_MIN = 1;
+const ZOOM_MAX = 5;
+
+/** Amplia uma foto em tela cheia com zoom (usado também na visualização da OS). */
 export function openPhotoLightbox(src) {
   const overlay = document.createElement('div');
   overlay.className = 'lightbox-overlay';
-  overlay.innerHTML = `<button class="lightbox-close" title="Fechar">✕</button><img src="${src}" alt="Foto ampliada">`;
+  overlay.innerHTML = `
+    <button class="lightbox-close" title="Fechar">✕</button>
+    <img src="${src}" alt="Foto ampliada" draggable="false">
+    <p class="lightbox-hint">Pince ou dê um toque duplo para ampliar</p>`;
+  const img = overlay.querySelector('img');
   const close = () => overlay.remove();
   overlay.querySelector('.lightbox-close').onclick = close;
   overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
   document.body.appendChild(overlay);
+
+  // Estado do zoom/arraste
+  let escala = 1, tx = 0, ty = 0;
+  const ponteiros = new Map();          // pointerId -> {x, y}
+  let distInicial = 0, escalaInicial = 1;
+  let ultimoToque = 0;
+
+  const aplicar = () => {
+    img.style.transform = `translate(${tx}px, ${ty}px) scale(${escala})`;
+    img.style.cursor = escala > 1 ? 'grab' : 'zoom-in';
+  };
+  const limitar = () => {
+    escala = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, escala));
+    if (escala === 1) { tx = 0; ty = 0; }
+  };
+  const distancia = () => {
+    const [a, b] = [...ponteiros.values()];
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  };
+
+  img.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    img.setPointerCapture(e.pointerId);
+    ponteiros.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (ponteiros.size === 2) {
+      distInicial   = distancia();
+      escalaInicial = escala;
+    }
+    // Duplo toque: alterna entre 1x e 2.5x
+    if (ponteiros.size === 1) {
+      const agora = Date.now();
+      if (agora - ultimoToque < 300) {
+        escala = escala > 1 ? 1 : 2.5;
+        limitar(); aplicar();
+      }
+      ultimoToque = agora;
+    }
+  });
+
+  img.addEventListener('pointermove', e => {
+    if (!ponteiros.has(e.pointerId)) return;
+    const anterior = ponteiros.get(e.pointerId);
+    ponteiros.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (ponteiros.size === 2 && distInicial > 0) {
+      // Pinça: escala proporcional à abertura dos dedos
+      escala = escalaInicial * (distancia() / distInicial);
+      limitar(); aplicar();
+    } else if (ponteiros.size === 1 && escala > 1) {
+      // Arraste com um dedo quando ampliado
+      tx += e.clientX - anterior.x;
+      ty += e.clientY - anterior.y;
+      aplicar();
+    }
+  });
+
+  ['pointerup', 'pointercancel'].forEach(ev =>
+    img.addEventListener(ev, e => {
+      ponteiros.delete(e.pointerId);
+      if (ponteiros.size < 2) distInicial = 0;
+    })
+  );
+
+  // Roda do mouse (desktop)
+  overlay.addEventListener('wheel', e => {
+    e.preventDefault();
+    escala *= e.deltaY < 0 ? 1.15 : 0.87;
+    limitar(); aplicar();
+  }, { passive: false });
+
+  aplicar();
 }

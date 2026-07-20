@@ -10,7 +10,7 @@
       para forçar a atualização do cache nos aparelhos.
    ============================================================ */
 
-const CACHE_NAME = 'oficina-pro-v7';
+const CACHE_NAME = 'oficina-pro-v8';
 const APP_SHELL = [
   './',
   './index.html',
@@ -37,6 +37,8 @@ const APP_SHELL = [
   './js/core/navigation.js',
   './js/core/app-state.js',
   './js/core/profile-store.js',
+  './js/core/sync-indicator.js',
+  './js/core/upload-progress.js',
   './js/services/supabase-client.js',
   './js/services/os-service.js',
   './js/services/fotos-service.js',

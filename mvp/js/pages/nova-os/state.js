@@ -6,7 +6,7 @@
 
 export const wizard = {
   // Dados coletados nos passos (vira a OS ao final)
-  data: { fotos: [], condicoes: [], senhaParao: [], itens: [] },
+  data: { fotos: [], fotoMeta: [], condicoes: [], senhaParao: [], itens: [] },
   // Passo atual do wizard (1 a 3)
   step: 1,
   // Dots selecionados no padrão de desbloqueio 3x3

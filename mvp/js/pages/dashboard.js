@@ -7,14 +7,14 @@
    ============================================================ */
 
 import { OS_STATUS } from '../config/constants.js';
-import { state } from '../core/app-state.js';
+import { state, isOSAtrasada } from '../core/app-state.js';
 import { escHtml } from '../utils/dom.js';
-import { formatCurrency, statusBadge } from '../utils/format.js';
+import { formatCurrency, formatDateShort, statusBadge } from '../utils/format.js';
 
 const RECENT_LIMIT = 5;
 
 // Estado dos filtros (persiste durante a sessão)
-const filtros = { query: '', status: '', showAll: false };
+const filtros = { query: '', status: '', atrasadas: false, showAll: false };
 
 /** Normaliza texto para busca (minúsculas, sem acentos). */
 function norm(str) {
@@ -60,18 +60,27 @@ export function dashToggleShowAll() {
   renderOSList();
 }
 
+/** Liga/desliga o filtro de OS atrasadas (card de métrica e chip). */
+export function dashFilterAtrasadas() {
+  filtros.atrasadas = !filtros.atrasadas;
+  renderDashboard();
+}
+
 function renderStatusChips() {
   const wrap = document.getElementById('status-chips');
   if (!wrap) return;
   const chips = [{ value: '', label: 'Todas' }, ...OS_STATUS];
   wrap.innerHTML = chips.map(s => `
     <button type="button" class="status-chip ${filtros.status === s.value ? 'active' : ''}"
-            onclick="dashFilterStatus('${s.value}')">${s.label}</button>`).join('');
+            onclick="dashFilterStatus('${s.value}')">${s.label}</button>`).join('') + `
+    <button type="button" class="status-chip chip-danger ${filtros.atrasadas ? 'active' : ''}"
+            onclick="dashFilterAtrasadas()">Atrasadas</button>`;
 }
 
 function osItemHTML(os) {
+  const atrasada = isOSAtrasada(os);
   return `
-    <div class="os-item" onclick="openOS('${escHtml(os.id)}')">
+    <div class="os-item ${atrasada ? 'os-item--atrasada' : ''}" onclick="openOS('${escHtml(os.id)}')">
       <div class="os-icon">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1a365d" stroke-width="1.8">
           <rect x="5" y="2" width="14" height="20" rx="2"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="11" x2="15" y2="11"/><line x1="9" y1="15" x2="12" y2="15"/>
@@ -81,6 +90,7 @@ function osItemHTML(os) {
         <div class="os-number">${escHtml(os.id)}</div>
         <div class="os-client">${escHtml(os.cliente)}</div>
         <div class="os-device">${escHtml(os.tipo)} — ${escHtml(os.marca)}</div>
+        ${atrasada ? `<div class="os-atraso-info">Previsão vencida em ${formatDateShort(os.previsao + 'T12:00:00')}</div>` : ''}
       </div>
       <div class="os-meta">
         <div class="os-value">${formatCurrency(os.valor)}</div>
@@ -108,7 +118,9 @@ function renderOSList() {
   }
 
   const filtradas = todas.filter(os =>
-    matchOS(os, filtros.query) && (!filtros.status || os.status === filtros.status)
+    matchOS(os, filtros.query) &&
+    (!filtros.status || os.status === filtros.status) &&
+    (!filtros.atrasadas || isOSAtrasada(os))
   );
 
   if (filtradas.length === 0) {
@@ -123,7 +135,7 @@ function renderOSList() {
 
   // Busca ou filtro ativo → mostra todos os resultados;
   // sem filtro → 5 recentes com botão "Ver todas"
-  const filtroAtivo = filtros.query.trim() !== '' || filtros.status !== '';
+  const filtroAtivo = filtros.query.trim() !== '' || filtros.status !== '' || filtros.atrasadas;
   const visiveis = (filtroAtivo || filtros.showAll)
     ? filtradas
     : filtradas.slice(0, RECENT_LIMIT);
@@ -145,11 +157,18 @@ function renderOSList() {
 export function renderDashboard() {
   const m = state.metrics();
 
-  // Métricas
-  document.getElementById('metric-os-hoje').textContent   = m.total;
-  // O Intl separa "R$" do valor com espaço não separável ( ) — removido para caber na métrica
+  // Métricas acionáveis
+  document.getElementById('metric-abertas').textContent   = m.emAberto;
+  document.getElementById('metric-atrasadas').textContent = m.atrasadas;
+  // O Intl separa "R$" do valor com espaço não separável — removido para caber na métrica
   document.getElementById('metric-faturamento').textContent = formatCurrency(m.faturamento).replace(/\s/, '');
-  document.getElementById('metric-nfse').textContent      = m.nfsEmitidas;
+
+  // O card "Atrasadas" fica vermelho quando há atraso e indica o filtro ativo
+  const cardAtrasadas = document.getElementById('metric-card-atrasadas');
+  if (cardAtrasadas) {
+    cardAtrasadas.classList.toggle('has-atraso', m.atrasadas > 0);
+    cardAtrasadas.classList.toggle('filtro-ativo', filtros.atrasadas);
+  }
 
   renderOSList();
 }

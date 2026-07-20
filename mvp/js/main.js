@@ -16,12 +16,14 @@
 
 import { navigate } from './core/navigation.js';
 import { state } from './core/app-state.js';
+import { updateSyncIndicator } from './core/sync-indicator.js';
+import { initUploadProgress } from './core/upload-progress.js';
 import { showToast } from './utils/dom.js';
 import { maskCPF } from './utils/masks.js';
 
 import { handleLogin, handleLogout, initApp } from './pages/login.js';
 import {
-  renderDashboard, dashSearch, dashFilterStatus, dashToggleShowAll,
+  renderDashboard, dashSearch, dashFilterStatus, dashToggleShowAll, dashFilterAtrasadas,
 } from './pages/dashboard.js';
 import {
   renderSettings, saveProfileData, switchConfigTab, setAmbiente,
@@ -49,12 +51,34 @@ import {
 import { openNFSe, emitirNFSe, confirmarNumeroNFSe } from './pages/nfse.js';
 import { renderLucratividade, exportCSV } from './pages/lucratividade.js';
 
+/** Toque na nuvem da barra superior: tenta reenviar as OS pendentes. */
+async function forceSyncPending() {
+  if (!state.pendingCount) {
+    showToast('Tudo sincronizado com o servidor.', 'success');
+    return;
+  }
+  if (!navigator.onLine) {
+    showToast('Sem conexão — os dados serão enviados quando a rede voltar.', 'error');
+    return;
+  }
+  const { synced, lastError } = await state.syncPending();
+  if (synced > 0) {
+    showToast(`${synced} OS sincronizada(s) com o servidor.`, 'success');
+    renderDashboard();
+  }
+  if (state.pendingCount > 0) {
+    showToast(lastError?.message || `${state.pendingCount} OS ainda pendente(s).`, 'error');
+  }
+}
+
 // ── Funções globais usadas nos onclick/oninput do HTML ──────────
 const globals = {
   // Navegação e telas
   navigate, renderDashboard, renderSettings, renderLucratividade,
   // Dashboard: busca e filtros
-  dashSearch, dashFilterStatus, dashToggleShowAll,
+  dashSearch, dashFilterStatus, dashToggleShowAll, dashFilterAtrasadas,
+  // Sincronização manual (nuvem da barra superior)
+  forceSyncPending,
   // Login
   handleLogin, handleLogout,
   // Configurações
@@ -80,6 +104,7 @@ Object.assign(window, globals);
 
 // ── Sincronização automática quando a rede volta ────────────────
 window.addEventListener('online', async () => {
+  updateSyncIndicator({});
   if (!state.pendingCount) return;
   const { synced } = await state.syncPending();
   if (synced > 0) {
@@ -87,6 +112,7 @@ window.addEventListener('online', async () => {
     renderDashboard();
   }
 });
+window.addEventListener('offline', () => updateSyncIndicator({}));
 
 // ── Registro do Service Worker (PWA offline + instalável) ──────
 if ('serviceWorker' in navigator) {
@@ -97,6 +123,8 @@ if ('serviceWorker' in navigator) {
 }
 
 // ── Inicialização ────────────────────────────────────────────────
+initUploadProgress();
+updateSyncIndicator({ pending: state.pendingCount });
 renderDashboard();
 renderLucratividade();
 navigate('screen-dashboard');

@@ -29,9 +29,11 @@ mvp/
     ├── config/
     │   └── constants.js  <- constantes, incl. OS_STATUS (ciclo de vida da OS)
     ├── core/
-    │   ├── app-state.js  <- estado das OS: localStorage + sincronização
+    │   ├── app-state.js  <- estado das OS: localStorage + sincronização + métricas
     │   ├── profile-store.js <- perfil da empresa em memória
-    │   └── navigation.js <- troca de telas
+    │   ├── navigation.js <- troca de telas
+    │   ├── sync-indicator.js <- nuvem de sincronização da barra superior
+    │   └── upload-progress.js <- aviso "Enviando foto X de Y..."
     ├── services/         <- CONEXÕES EXTERNAS (backend)
     │   ├── supabase-client.js <- URL e chave do Supabase (edite ao trocar de projeto)
     │   ├── os-service.js      <- salvar/carregar OS no banco
@@ -90,6 +92,9 @@ atualizam sozinhos. Nunca renomeie os valores existentes (estão gravados no ban
 | Texto legal das assinaturas | `js/pages/os-view/assinatura.js` (objeto `MODOS`) |
 | Termos e condições padrão | `js/pages/os-view/os-view.js` (seção "Termos") — ou pelo próprio app em Configurações |
 | Limite de fotos / qualidade JPEG | `js/pages/nova-os/fotos.js` (constantes `MAX_FOTOS`, `JPEG_QUALITY`) |
+| Regra de "OS atrasada" | `js/core/app-state.js` (função `isOSAtrasada`) |
+| Ícones/estados da nuvem de sincronização | `js/core/sync-indicator.js` |
+| Zoom máximo do lightbox de fotos | `js/pages/nova-os/fotos.js` (constante `ZOOM_MAX`) |
 | Layout da OS impressa/PDF | `css/print.css` |
 | Colunas do relatório CSV | `js/pages/lucratividade.js` (função `exportCSV`) |
 | Nome/ícone do app instalado | `manifest.json` + `assets/icons/icon.svg` |

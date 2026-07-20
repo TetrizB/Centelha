@@ -180,3 +180,21 @@ textarea.form-control { resize: vertical; min-height: 90px; }
   font-size: .8rem;
   color: var(--primary);
 }
+
+/* ── Lightbox com zoom ──────────────────────────────────────── */
+.lightbox-overlay { overflow: hidden; }
+.lightbox-overlay img {
+  touch-action: none;        /* gestos de pinça/arraste controlados por JS */
+  user-select: none;
+  will-change: transform;
+  transform-origin: center;
+}
+.lightbox-hint {
+  position: fixed;
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(255,255,255,.75);
+  font-size: .72rem;
+  pointer-events: none;
+}

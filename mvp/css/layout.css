@@ -100,3 +100,28 @@
 .screen.active { display: block; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
+
+/* ── Indicador de sincronização (barra superior) ────────────── */
+/* Estados aplicados por js/core/sync-indicator.js */
+#sync-indicator { position: relative; }
+#sync-indicator.sync-ok      { color: #9ae6b4; }   /* verde suave sobre navy */
+#sync-indicator.sync-offline { color: rgba(255,255,255,.45); }
+#sync-indicator.sync-pending { color: #fbd38d; }   /* âmbar: há OS na fila */
+#sync-indicator.sync-busy svg {
+  animation: sync-spin 1s linear infinite;
+  transform-origin: center;
+}
+@keyframes sync-spin { to { transform: rotate(360deg); } }
+.sync-count {
+  position: absolute;
+  top: -4px; right: -4px;
+  min-width: 16px; height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--danger);
+  color: #fff;
+  font-size: .62rem;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}

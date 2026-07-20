@@ -145,3 +145,19 @@
   overflow-y: auto;
   box-shadow: 0 24px 64px rgba(0, 0, 0, .35);
 }
+
+/* ── Evidência fotográfica no documento ─────────────────────── */
+.foto-evidencia-nota {
+  font-size: .68rem;
+  color: var(--muted);
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
+  line-height: 1.5;
+}
+.os-doc-empresa {
+  font-size: .8rem;
+  font-weight: 600;
+  opacity: .9;
+  margin-bottom: 2px;
+}

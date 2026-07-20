@@ -57,9 +57,30 @@
   .os-doc-body table th,
   .os-doc-body table td { font-size: .65rem !important; padding: 2px 4px !important; }
 
-  /* Ocultar fotos (pesadas, não cabem em A4) */
-  .photo-grid { display: none !important; }
-  .os-doc-section:has(.photo-grid) { display: none !important; }
+  /* Evidência fotográfica: fotos com carimbo de data/hora/GPS
+     impressas em grade compacta (prova do estado de entrada) */
+  .photo-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 3mm !important;
+    break-inside: avoid;
+  }
+  .photo-thumb {
+    width: auto !important;
+    height: auto !important;
+    border: 1px solid #cbd5e0 !important;
+    border-radius: 2px !important;
+    overflow: hidden;
+  }
+  .photo-thumb img {
+    width: 100% !important;
+    height: auto !important;
+    max-height: 42mm !important;
+    object-fit: contain !important;
+    display: block;
+  }
+  .photo-remove { display: none !important; }
+  .foto-evidencia-nota { font-size: .58rem !important; }
 
   /* Assinatura: se pendente → linha para assinar fisicamente */
   .sign-status { padding: 4px 8px !important; font-size: .68rem !important; break-inside: avoid; }
