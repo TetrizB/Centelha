@@ -11,7 +11,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#1a365d">
   <meta name="description" content="Gestão de ordens de serviço para oficinas técnicas">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://vpjleuxialhmxuopdzjt.supabase.co wss://vpjleuxialhmxuopdzjt.supabase.co https://nominatim.openstreetmap.org https://viacep.com.br; frame-src 'none'; object-src 'none';">
+  <!-- ATENÇÃO: img-src e connect-src incluem o domínio do Supabase.
+       Ao trocar de projeto Supabase (ver js/services/supabase-client.js),
+       atualize também as duas ocorrências da URL abaixo — senão as
+       fotos enviadas à nuvem ficam com o ícone de imagem quebrada,
+       bloqueadas silenciosamente por esta política. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://vpjleuxialhmxuopdzjt.supabase.co; connect-src 'self' https://vpjleuxialhmxuopdzjt.supabase.co wss://vpjleuxialhmxuopdzjt.supabase.co https://nominatim.openstreetmap.org https://viacep.com.br; frame-src 'none'; object-src 'none';">
 
 
   <!-- Favicon (aba do navegador) -->

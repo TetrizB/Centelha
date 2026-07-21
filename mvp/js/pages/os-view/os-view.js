@@ -81,8 +81,14 @@ function msgAparelhoPronto(os, perfil) {
 
 // ── Renderização do documento ──────────────────────────────────
 
+// Se a imagem falhar ao carregar (link expirado, falha momentânea de rede,
+// bloqueio de CSP), troca o ícone quebrado por um aviso explicativo em vez
+// de deixar o "ícone de imagem quebrada" cru para o técnico.
 function fotoThumb(src, i) {
-  return `<div class="photo-thumb"><img src="${src}" alt="Foto ${i + 1}" loading="lazy" onclick="openPhotoLightbox(this.src)"></div>`;
+  return `<div class="photo-thumb"><img src="${src}" alt="Foto ${i + 1}" loading="lazy"
+    onclick="openPhotoLightbox(this.src)"
+    onerror="this.closest('.photo-thumb').innerHTML='<p class=&quot;foto-erro&quot;>Foto indisponível no momento</p>'"
+  ></div>`;
 }
 
 function buildPhotoHTML(os) {

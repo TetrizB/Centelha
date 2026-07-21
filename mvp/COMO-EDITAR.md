@@ -99,7 +99,7 @@ atualizam sozinhos. Nunca renomeie os valores existentes (estão gravados no ban
 | Colunas do relatório CSV | `js/pages/lucratividade.js` (função `exportCSV`) |
 | Nome/ícone do app instalado | `manifest.json` + `assets/icons/icon.svg` |
 
-## 3 regras de ouro
+## 4 regras de ouro
 
 1. **Criou/renomeou um arquivo CSS ou JS?**
    Atualize a lista `APP_SHELL` no `sw.js` **e aumente a versão** do `CACHE_NAME` (`v7` -> `v8`). Sem isso, os celulares continuam usando a versão antiga em cache.
@@ -109,6 +109,14 @@ atualizam sozinhos. Nunca renomeie os valores existentes (estão gravados no ban
 
 3. **Não reordene os `<link>` de CSS no `index.html`.**
    A ordem de carregamento define qual regra vence.
+
+4. **Trocou de projeto Supabase?**
+   Além de atualizar `js/services/supabase-client.js`, atualize a URL nas
+   diretivas `img-src` e `connect-src` da tag `Content-Security-Policy` no
+   `<head>` do `index.html`. Sem isso, as fotos que sobem para o Supabase
+   Storage carregam com "ícone de imagem quebrada" — o navegador bloqueia
+   silenciosamente o carregamento por não reconhecer o novo domínio (foi
+   exatamente esse bug que corrigimos ao adicionar o domínio ao `img-src`).
 
 ## Padrão visual
 

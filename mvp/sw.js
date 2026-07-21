@@ -10,7 +10,7 @@
       para forçar a atualização do cache nos aparelhos.
    ============================================================ */
 
-const CACHE_NAME = 'oficina-pro-v8';
+const CACHE_NAME = 'oficina-pro-v9';
 const APP_SHELL = [
   './',
   './index.html',
