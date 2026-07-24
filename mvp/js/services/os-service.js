@@ -52,7 +52,9 @@ export async function dbSave(os) {
         data_criacao: os.dataCriacao,
         dados:        dadosSemFotos,
       },
-      { onConflict: 'os_id' }   // usa nossa coluna de texto, não o UUID
+      // Conflito por (user_id, os_id): a numeração é única POR oficina,
+      // não global. Precisa do índice idx_os_user_osid em supabase/setup.sql.
+      { onConflict: 'user_id,os_id' }
     );
 
   if (error) console.error('[DB] dbSave:', error.message);

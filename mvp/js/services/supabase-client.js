@@ -24,12 +24,34 @@ export const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
 
 // ── Sessão ──────────────────────────────────────────────────────
 
-/** Retorna a sessão ativa, tentando refresh silencioso se necessário. */
+// Renova o token quando falta menos que isto para expirar (evita gravar
+// com um JWT vencido, o que faz o servidor rejeitar com auth.uid() nulo).
+const RENOVAR_ANTES_MS = 60000; // 60 segundos
+
+/**
+ * Retorna a sessão ativa e VÁLIDA, renovando o token se necessário.
+ * getSession() devolve a sessão salva mesmo com o token já expirado —
+ * por isso conferimos a expiração e renovamos antes de usar.
+ */
 export async function dbGetSession() {
   const { data: { session } } = await db.auth.getSession();
-  if (session) return session;
-  const { data } = await db.auth.refreshSession();
-  return data?.session ?? null;
+
+  // Sem sessão salva: última tentativa via refresh
+  if (!session) {
+    const { data } = await db.auth.refreshSession();
+    return data?.session ?? null;
+  }
+
+  // Token expirado (ou quase): renova antes de devolver.
+  // Se o refresh falhar (ex.: offline), mantém a sessão atual — a gravação
+  // falha naturalmente e a OS vai para a fila de reenvio.
+  const expiraEmMs = (session.expires_at ?? 0) * 1000 - Date.now();
+  if (expiraEmMs < RENOVAR_ANTES_MS) {
+    const { data } = await db.auth.refreshSession();
+    return data?.session ?? session;
+  }
+
+  return session;
 }
 
 export async function dbSignIn(email, password) {

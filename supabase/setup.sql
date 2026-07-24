@@ -15,9 +15,6 @@ ALTER TABLE ordens_servico ADD COLUMN IF NOT EXISTS status       TEXT;
 ALTER TABLE ordens_servico ADD COLUMN IF NOT EXISTS data_criacao TIMESTAMPTZ;
 ALTER TABLE ordens_servico ADD COLUMN IF NOT EXISTS dados        JSONB;
 
--- Índice único em os_id (nosso identificador de app, ex: "OS-2026-0001")
-CREATE UNIQUE INDEX IF NOT EXISTS idx_os_os_id ON ordens_servico(os_id);
-
 -- Migra linhas antigas que tinham o id dentro do JSON
 UPDATE ordens_servico
 SET os_id = dados->>'id'
@@ -27,6 +24,17 @@ WHERE os_id IS NULL AND dados->>'id' IS NOT NULL;
 UPDATE ordens_servico
 SET user_id = (SELECT id FROM auth.users ORDER BY created_at LIMIT 1)
 WHERE user_id IS NULL;
+
+-- Índice único de os_id POR USUÁRIO (não global).
+-- Cada oficina tem sua própria numeração, então duas oficinas podem ter
+-- "OS-2026-0001" sem colidir. O índice global antigo (idx_os_os_id) causava
+-- o erro 42501 (violação de RLS): quando a 2ª oficina criava a mesma
+-- numeração, o upsert tentava atualizar a linha da 1ª oficina, barrada pela
+-- policy USING (auth.uid() = user_id).
+-- Os backfills acima rodam antes para o índice composto ser criado com
+-- user_id já preenchido.
+DROP INDEX IF EXISTS idx_os_os_id;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_os_user_osid ON ordens_servico(user_id, os_id);
 
 -- Remove TODAS as policies antigas
 DROP POLICY IF EXISTS "acesso publico"        ON ordens_servico;

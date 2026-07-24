@@ -142,6 +142,7 @@ O Netlify publica automaticamente a pasta `mvp/` (configurado em `../netlify.tom
 
 ## Banco de dados (Supabase)
 
-- Schema, políticas de segurança (RLS) e bucket de fotos: `../supabase/setup.sql` — executar uma vez no SQL Editor do Supabase ao criar/trocar de projeto.
+- Schema, políticas de segurança (RLS) e bucket de fotos: `../supabase/setup.sql` — executar uma vez no SQL Editor do Supabase ao criar/trocar de projeto. **Ao aplicar mudanças de código que dependem do banco (ex.: a numeração de OS por oficina), rode o `setup.sql` atualizado antes de publicar.**
+- A numeração de OS (`OS-2026-0001`...) é **única por oficina**, garantida pelo índice `idx_os_user_osid (user_id, os_id)`. Duas oficinas podem ter o mesmo número sem conflito. O `upsert` em `os-service.js` usa `onConflict: 'user_id,os_id'` — os dois têm que casar.
 - A chave no `supabase-client.js` é a **publicável** (segura no front-end); a segurança real vem das políticas RLS por usuário.
 - Campos novos da OS (diagnóstico, assinatura de retirada, data de entrega) são gravados dentro do JSON `dados` — não exigem migração de schema.
